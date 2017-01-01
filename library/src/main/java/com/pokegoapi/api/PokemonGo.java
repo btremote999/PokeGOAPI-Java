@@ -377,9 +377,9 @@ public class PokemonGo {
 		setLongitude(longitude);
 		setAltitude(altitude);
 		setAccuracy(accuracy);
-		if (!heartbeat.active() && !Double.isNaN(latitude) && !Double.isNaN(longitude)) {
-			heartbeat.start();
-		}
+//		if (!heartbeat.active() && !Double.isNaN(latitude) && !Double.isNaN(longitude)) {
+//			heartbeat.start();
+//		}
 	}
 
 	public long currentTimeMillis() {
