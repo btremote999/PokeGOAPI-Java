@@ -41,7 +41,7 @@ import java.util.List;
  */
 public class PokeHashProvider implements HashProvider {
 //	private static final String HASH_ENDPOINT = "https://pokehash.buddyauth.com/api/v121_2/hash";
-	private static final String HASH_ENDPOINT = "https://pokehash.buddyauth.com/api/v122/hash";
+	private static final String HASH_ENDPOINT = "https://pokehash.buddyauth.com/api/v121_2/hash";
 
 	private static final int VERSION = 5100;
 	private static final long UNK25 = -8832040574896607694L;
@@ -49,13 +49,17 @@ public class PokeHashProvider implements HashProvider {
 	private static final Moshi MOSHI = new Builder().build();
 
 	private final String key;
+    private final String endPoint;
+    private final HashApiCounterListener listener;
 
 	/**
 	 * Creates a PokeHashProvider with the given key
 	 * @param key the key for the PokeHash API
 	 */
-	public PokeHashProvider(String key) {
+	public PokeHashProvider(String key, String endPoint, HashApiCounterListener listener) {
 		this.key = key;
+        this.endPoint = endPoint;
+        this.listener = listener;
 		if (key == null) {
 			throw new IllegalArgumentException("Key cannot be null!");
 		}
@@ -64,9 +68,14 @@ public class PokeHashProvider implements HashProvider {
 	@Override
 	public Hash provide(long timestamp, double latitude, double longitude, double altitude, byte[] authTicket,
 						byte[] sessionData, byte[][] requests) throws HashException {
+
+        if(listener != null)
+            listener.hashCalled();
+
 		Request request = new Request(latitude, longitude, altitude, timestamp, authTicket, sessionData, requests);
 		try {
-			HttpsURLConnection connection = (HttpsURLConnection) new URL(HASH_ENDPOINT).openConnection();
+//			HttpsURLConnection connection = (HttpsURLConnection) new URL(HASH_ENDPOINT).openConnection();
+			HttpsURLConnection connection = (HttpsURLConnection) new URL(this.endPoint).openConnection();
 			connection.setRequestMethod("POST");
 			connection.setRequestProperty("X-AuthToken", key);
 			connection.setRequestProperty("content-type", "application/json");
@@ -191,4 +200,8 @@ public class PokeHashProvider implements HashProvider {
 			}
 		}
 	}
+
+    public interface HashApiCounterListener{
+        void hashCalled();
+    }
 }

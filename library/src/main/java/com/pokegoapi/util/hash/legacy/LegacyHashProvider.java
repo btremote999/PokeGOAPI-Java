@@ -19,6 +19,7 @@ import com.pokegoapi.util.NiaHash;
 import com.pokegoapi.util.hash.Hash;
 import com.pokegoapi.util.hash.HashProvider;
 import com.pokegoapi.util.hash.crypto.Crypto;
+import com.pokegoapi.util.hash.pokehash.PokeHashProvider.HashApiCounterListener;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -31,9 +32,18 @@ public class LegacyHashProvider implements HashProvider {
 	private static final int VERSION = 4500;
 	private static final long UNK25 = -1553869577012279119L;
 
+    private static HashApiCounterListener listener;
+
+    public LegacyHashProvider(HashApiCounterListener listener){
+        this.listener = listener;
+    }
+
 	@Override
 	public Hash provide(long timestamp, double latitude, double longitude, double altitude, byte[] authTicket,
 						byte[] sessionData, byte[][] requests) {
+        if(listener != null)
+            listener.hashCalled();
+
 		int locationHash = getLocationHash(latitude, longitude, altitude);
 		int locationAuthHash = getLocationAuthHash(latitude, longitude, altitude, authTicket);
 		List<Long> requestHashes = new ArrayList<>();
