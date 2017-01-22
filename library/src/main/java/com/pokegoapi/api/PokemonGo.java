@@ -507,6 +507,7 @@ public class PokemonGo {
 	 * Returns all listeners for the given type.
 	 *
 	 * @param listenerType the type of listeners to return
+     * @param <T> generic listener
 	 * @return all listeners for the given type
 	 */
 	public <T extends Listener> List<T> getListeners(Class<T> listenerType) {

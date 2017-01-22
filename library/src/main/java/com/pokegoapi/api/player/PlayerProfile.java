@@ -561,6 +561,7 @@ public class PlayerProfile {
 	 * @throws LoginFailedException   when the auth is invalid
 	 * @throws RemoteServerException  when the server is down/having issues
 	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
+     * @return CodeName
 	 */
 	public String claimCodeName() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return claimCodeName(null);
@@ -573,6 +574,7 @@ public class PlayerProfile {
 	 * @throws LoginFailedException   when the auth is invalid
 	 * @throws RemoteServerException  when the server is down/having issues
 	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
+     * @return code name
 	 */
 	public String claimCodeName(String lastFailure)
 			throws LoginFailedException, CaptchaActiveException, RemoteServerException {

@@ -55,6 +55,8 @@ public class PokemonDetails {
 
 	/**
 	 * Applies the given PokemonData proto to these PokemonDetails
+     *
+     * @param  proto Proto
 	 */
 	public void applyProto(PokemonData proto) {
 		id = proto.getId();

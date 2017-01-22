@@ -55,6 +55,8 @@ public class PokeHashProvider implements HashProvider {
 	/**
 	 * Creates a PokeHashProvider with the given key
 	 * @param key the key for the PokeHash API
+     * @param endPoint End Point of Poke Api Hash service
+     * @param listener Listener of Hash Api response
 	 */
 	public PokeHashProvider(String key, String endPoint, HashApiCounterListener listener) {
 		this.key = key;

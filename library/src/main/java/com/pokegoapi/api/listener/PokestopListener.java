@@ -10,6 +10,7 @@ public interface PokestopListener extends Listener {
 	/**
 	 * Called when a Pokestop is looted
 	 * @param result the loot result from this pokestop
+     * @param pokestop target pokestop
 	 */
 	void onLoot(PokestopLootResult result, Pokestop pokestop);
 }

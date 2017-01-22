@@ -168,6 +168,7 @@ public class Map {
 
 	/**
 	 * Blocks this thread until MapObjects are updates
+     * @throws InterruptedException when interrupted
 	 */
 	public void awaitUpdate() throws InterruptedException {
 		synchronized (this.updateLock) {

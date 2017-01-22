@@ -477,6 +477,7 @@ public class CatchablePokemon implements MapPoint {
 	 * @throws NoSuchItemException the no such item exception
 	 * @throws CaptchaActiveException the encounter failed exception
 	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
+     * @throws EncounterFailedException if excounter failed
 	 */
 	public Observable<CatchResult> catchPokemon(EncounterResult encounter,
 												AsyncCatchOptions options)
