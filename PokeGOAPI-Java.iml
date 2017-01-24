@@ -21,6 +21,5 @@
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />
-    <orderEntry type="library" exported="" name="PokeGOAPI-Java.PokeGOAPI-0.4.1" level="project" />
   </component>
 </module>

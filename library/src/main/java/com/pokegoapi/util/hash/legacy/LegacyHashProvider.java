@@ -41,16 +41,18 @@ public class LegacyHashProvider implements HashProvider {
 	@Override
 	public Hash provide(long timestamp, double latitude, double longitude, double altitude, byte[] authTicket,
 						byte[] sessionData, byte[][] requests) {
-        if(listener != null)
-            listener.hashCalled();
-
 		int locationHash = getLocationHash(latitude, longitude, altitude);
 		int locationAuthHash = getLocationAuthHash(latitude, longitude, altitude, authTicket);
 		List<Long> requestHashes = new ArrayList<>();
 		for (byte[] request : requests) {
 			requestHashes.add(getRequestHash(request, authTicket));
 		}
-		return new Hash(locationAuthHash, locationHash, requestHashes);
+
+        if(listener != null) {
+            listener.hashSuccess(System.currentTimeMillis() - timestamp);
+        }
+
+        return new Hash(locationAuthHash, locationHash, requestHashes);
 	}
 
 	@Override
