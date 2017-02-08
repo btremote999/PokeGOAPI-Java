@@ -16,7 +16,7 @@
 package com.pokegoapi.auth;
 
 import POGOProtos.Networking.Envelopes.RequestEnvelopeOuterClass.RequestEnvelope.AuthInfo;
-
+import com.pokegoapi.exceptions.CaptchaActiveException;
 import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
 
@@ -25,9 +25,9 @@ import com.pokegoapi.exceptions.RemoteServerException;
  */
 public abstract class CredentialProvider {
 
-	public abstract String getTokenId() throws LoginFailedException, RemoteServerException;
+	public abstract String getTokenId() throws LoginFailedException, CaptchaActiveException, RemoteServerException;
 
-	public abstract AuthInfo getAuthInfo() throws LoginFailedException, RemoteServerException;
+	public abstract AuthInfo getAuthInfo() throws LoginFailedException, CaptchaActiveException, RemoteServerException;
 
 	public abstract boolean isTokenIdExpired();
 }

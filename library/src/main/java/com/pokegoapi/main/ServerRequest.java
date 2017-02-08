@@ -18,11 +18,16 @@ package com.pokegoapi.main;
 import POGOProtos.Networking.Requests.RequestOuterClass;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass;
 
+import POGOProtos.Networking.Requests.RequestTypeOuterClass.RequestType;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.GeneratedMessage;
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import lombok.Getter;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * The type Server request.
@@ -34,6 +39,10 @@ public class ServerRequest {
 	@Getter
 	private RequestTypeOuterClass.RequestType type;
 	private ByteString data;
+	@Getter
+	private boolean requireCommon;
+	@Getter
+	private Set<RequestType> exclude = new HashSet<>();
 
 	/**
 	 * Instantiates a new Server request.
@@ -80,5 +89,24 @@ public class ServerRequest {
 			throw new InvalidProtocolBufferException("Contents of buffer are null");
 		}
 		return data;
+	}
+
+	/**
+	 * Adds a common request to this request
+	 * @return this object
+	 */
+	public ServerRequest withCommons() {
+		this.requireCommon = true;
+		return this;
+	}
+
+	/**
+	 * Excludes the given requests from the next packet
+	 * @param types the types to exclude
+	 * @return this object
+	 */
+	public ServerRequest exclude(RequestType... types) {
+		Collections.addAll(exclude, types);
+		return this;
 	}
 }

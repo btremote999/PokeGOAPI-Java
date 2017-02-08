@@ -16,38 +16,41 @@
 package com.pokegoapi.api.gym;
 
 import POGOProtos.Data.Gym.GymMembershipOuterClass.GymMembership;
+import POGOProtos.Data.Gym.GymStateOuterClass.GymState;
 import POGOProtos.Data.PokemonDataOuterClass.PokemonData;
 import POGOProtos.Enums.PokemonIdOuterClass;
 import POGOProtos.Enums.TeamColorOuterClass;
 import POGOProtos.Map.Fort.FortDataOuterClass.FortData;
-import POGOProtos.Networking.Requests.Messages.GetGymDetailsMessageOuterClass.GetGymDetailsMessage;
 import POGOProtos.Networking.Requests.Messages.FortDeployPokemonMessageOuterClass.FortDeployPokemonMessage;
+import POGOProtos.Networking.Requests.Messages.GetGymDetailsMessageOuterClass.GetGymDetailsMessage;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass.RequestType;
-import POGOProtos.Networking.Responses.GetGymDetailsResponseOuterClass.GetGymDetailsResponse;
 import POGOProtos.Networking.Responses.FortDeployPokemonResponseOuterClass.FortDeployPokemonResponse;
-
+import POGOProtos.Networking.Responses.GetGymDetailsResponseOuterClass.GetGymDetailsResponse;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.google.protobuf.ProtocolStringList;
 import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.api.pokemon.Pokemon;
+import com.pokegoapi.exceptions.AsyncRemoteServerException;
+import com.pokegoapi.exceptions.CaptchaActiveException;
+import com.pokegoapi.exceptions.InsufficientLevelException;
 import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
-import com.pokegoapi.exceptions.AsyncRemoteServerException;
-import com.pokegoapi.main.ServerRequest;
 import com.pokegoapi.main.AsyncServerRequest;
+import com.pokegoapi.main.PokemonMeta;
+import com.pokegoapi.main.ServerRequest;
 import com.pokegoapi.util.MapPoint;
+import rx.Observable;
+import rx.functions.Func1;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import rx.Observable;
-import rx.functions.Func1;
 
 public class Gym implements MapPoint {
 	private FortData proto;
 	private GetGymDetailsResponse details;
 	private PokemonGo api;
+	private long points;
 
 	/**
 	 * Gym object.
@@ -58,17 +61,19 @@ public class Gym implements MapPoint {
 	public Gym(PokemonGo api, FortData proto) {
 		this.api = api;
 		this.proto = proto;
-		this.details = null;
+		this.points = proto.getGymPoints();
 	}
 
 	public String getId() {
 		return proto.getId();
 	}
 
+	@Override
 	public double getLatitude() {
 		return proto.getLatitude();
 	}
 
+	@Override
 	public double getLongitude() {
 		return proto.getLongitude();
 	}
@@ -90,22 +95,38 @@ public class Gym implements MapPoint {
 	}
 
 	public long getPoints() {
-		return proto.getGymPoints();
+		return points;
 	}
 
 	public boolean getIsInBattle() {
 		return proto.getIsInBattle();
 	}
 
-	public boolean isAttackable() throws LoginFailedException, RemoteServerException {
+	public boolean isAttackable() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return this.getGymMembers().size() != 0;
 	}
 
-	public Battle battle(Pokemon[] team) {
-		return new Battle(api, team, this);
+	/**
+	 * Creates a battle for this gym
+	 * @return the battle object
+	 */
+	public Battle battle() {
+		int minimumPlayerLevel = PokemonMeta.battleSettings.getMinimumPlayerLevel();
+		if (api.getPlayerProfile().getLevel() < minimumPlayerLevel) {
+			throw new InsufficientLevelException("You must be at least " + minimumPlayerLevel + " to battle a gym!");
+		}
+		return new Battle(api, this);
 	}
 
-	private GetGymDetailsResponse details() throws LoginFailedException, RemoteServerException {
+	/**
+	 * Clears the details cache for this gym, and when requested again will send a request to the server instead of
+	 * using the cached values.
+	 */
+	public void clearDetails() {
+		details = null;
+	}
+
+	private GetGymDetailsResponse details() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		if (details == null) {
 			GetGymDetailsMessage reqMsg = GetGymDetailsMessage
 					.newBuilder()
@@ -131,29 +152,31 @@ public class Gym implements MapPoint {
 		return details;
 	}
 
-	public String getName() throws LoginFailedException, RemoteServerException {
+	public String getName() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return details().getName();
 	}
 
-	public ProtocolStringList getUrlsList() throws LoginFailedException, RemoteServerException {
+	public ProtocolStringList getUrlsList() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return details().getUrlsList();
 	}
 
-	public GetGymDetailsResponse.Result getResult() throws LoginFailedException, RemoteServerException {
+	public GetGymDetailsResponse.Result getResult()
+			throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return details().getResult();
 	}
 
-	public boolean inRange() throws LoginFailedException, RemoteServerException {
+	public boolean inRange() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		GetGymDetailsResponse.Result result = getResult();
 		return (result != GetGymDetailsResponse.Result.ERROR_NOT_IN_RANGE);
 	}
 
-	public String getDescription() throws LoginFailedException, RemoteServerException {
+	public String getDescription() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return details().getDescription();
 	}
 
 
-	public List<GymMembership> getGymMembers() throws LoginFailedException, RemoteServerException {
+	public List<GymMembership> getGymMembers()
+			throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return details().getGymState().getMembershipsList();
 	}
 
@@ -163,8 +186,10 @@ public class Gym implements MapPoint {
 	 * @return List of pokemon
 	 * @throws LoginFailedException  if the login failed
 	 * @throws RemoteServerException When a buffer exception is thrown
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
-	public List<PokemonData> getDefendingPokemon() throws LoginFailedException, RemoteServerException {
+	public List<PokemonData> getDefendingPokemon()
+			throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		List<PokemonData> data = new ArrayList<PokemonData>();
 
 		for (GymMembership gymMember : getGymMembers()) {
@@ -181,9 +206,10 @@ public class Gym implements MapPoint {
 	 * @return Result of attempt to deploy pokemon
 	 * @throws LoginFailedException  if the login failed
 	 * @throws RemoteServerException When a buffer exception is thrown
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
 	public FortDeployPokemonResponse.Result deployPokemon(Pokemon pokemon)
-			throws LoginFailedException, RemoteServerException {
+			throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		FortDeployPokemonMessage reqMsg = FortDeployPokemonMessage.newBuilder()
 				.setFortId(getId())
 				.setPlayerLatitude(api.getLatitude())
@@ -209,9 +235,10 @@ public class Gym implements MapPoint {
 	 * @return Result of attempt to deploy pokemon
 	 * @throws LoginFailedException  if the login failed
 	 * @throws RemoteServerException When a buffer exception is thrown
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
 	public Observable<FortDeployPokemonResponse.Result> deployPokemonAsync(Pokemon pokemon)
-			throws RemoteServerException, LoginFailedException {
+			throws RemoteServerException, CaptchaActiveException, LoginFailedException {
 		FortDeployPokemonMessage reqMsg = FortDeployPokemonMessage.newBuilder()
 				.setFortId(getId())
 				.setPlayerLatitude(api.getLatitude())
@@ -243,4 +270,30 @@ public class Gym implements MapPoint {
 		return api;
 	}
 
+	/**
+	 * Updates this gym's point count by the given delta
+	 * @param delta the amount to change the points by
+	 */
+	public void updatePoints(int delta) {
+		this.points += delta;
+	}
+
+	/**
+	 * Updates this gym with the given gym state
+	 * @param state the state to update from
+	 */
+	public void updateState(GymState state) {
+		proto = state.getFortData();
+		clearDetails();
+	}
+
+	@Override
+	public int hashCode() {
+		return getId().hashCode();
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		return obj instanceof Gym && ((Gym) obj).getId().equals(getId());
+	}
 }

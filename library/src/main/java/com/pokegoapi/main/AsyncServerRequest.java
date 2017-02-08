@@ -15,24 +15,32 @@
 
 package com.pokegoapi.main;
 
-import com.google.protobuf.GeneratedMessage;
-
 import POGOProtos.Networking.Requests.RequestOuterClass.Request;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass.RequestType;
+import com.google.protobuf.GeneratedMessage;
 import lombok.Getter;
+
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * The type Server request.
  */
 public class AsyncServerRequest {
+	private static final AtomicLong CURRENT_ID = new AtomicLong(System.currentTimeMillis());
+
 	@Getter
-	private final long id = System.nanoTime();
+	private final long id = CURRENT_ID.getAndIncrement();
 	@Getter
 	private final RequestType type;
 	@Getter
 	private final Request request;
 	@Getter
-	private final boolean requireCommonRequest;
+	private boolean requireCommonRequest;
+	@Getter
+	private Set<RequestType> exclude = new HashSet<>();
 
 	/**
 	 * Instantiates a new Server request.
@@ -70,5 +78,35 @@ public class AsyncServerRequest {
 		this.type = type;
 		this.request = req;
 		this.requireCommonRequest = false;
+	}
+
+	/**
+	 * Adds a common request to this request if the given parameter is true
+	 * @param requireCommon if this request should add commons
+	 * @return this object
+	 */
+	public AsyncServerRequest withCommons(boolean requireCommon) {
+		this.requireCommonRequest = requireCommon;
+		return this;
+	}
+
+	/**
+	 * Excludes the given requests from the next packet
+	 * @param types the types to exclude
+	 * @return this object
+	 */
+	public AsyncServerRequest exclude(RequestType... types) {
+		Collections.addAll(exclude, types);
+		return this;
+	}
+
+	/**
+	 * Excludes the given requests from the next packet
+	 * @param types the types to exclude
+	 * @return this object
+	 */
+	public AsyncServerRequest exclude(Set<RequestType> types) {
+		exclude.addAll(types);
+		return this;
 	}
 }

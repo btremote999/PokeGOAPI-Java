@@ -15,29 +15,37 @@
 
 package com.pokegoapi.api.inventory;
 
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.pokegoapi.api.PokemonGo;
-import com.pokegoapi.api.pokemon.EggPokemon;
-import com.pokegoapi.api.pokemon.Pokemon;
-import com.pokegoapi.exceptions.LoginFailedException;
-import com.pokegoapi.exceptions.RemoteServerException;
-import com.pokegoapi.main.ServerRequest;
-
-import java.util.ArrayList;
-import java.util.List;
-
+import POGOProtos.Data.PokemonDataOuterClass.PokemonData;
 import POGOProtos.Enums.PokemonFamilyIdOuterClass;
 import POGOProtos.Enums.PokemonIdOuterClass.PokemonId;
+import POGOProtos.Inventory.AppliedItemOuterClass.AppliedItem;
+import POGOProtos.Inventory.AppliedItemsOuterClass.AppliedItems;
 import POGOProtos.Inventory.EggIncubatorOuterClass;
+import POGOProtos.Inventory.EggIncubatorsOuterClass.EggIncubators;
 import POGOProtos.Inventory.InventoryItemDataOuterClass;
 import POGOProtos.Inventory.InventoryItemOuterClass;
 import POGOProtos.Inventory.Item.ItemDataOuterClass.ItemData;
 import POGOProtos.Inventory.Item.ItemIdOuterClass.ItemId;
 import POGOProtos.Networking.Requests.Messages.GetInventoryMessageOuterClass.GetInventoryMessage;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass;
-import POGOProtos.Networking.Responses.DownloadSettingsResponseOuterClass.DownloadSettingsResponse;
 import POGOProtos.Networking.Responses.GetInventoryResponseOuterClass.GetInventoryResponse;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.pokegoapi.api.PokemonGo;
+import com.pokegoapi.api.pokemon.EggPokemon;
+import com.pokegoapi.api.pokemon.Pokemon;
+import com.pokegoapi.exceptions.CaptchaActiveException;
+import com.pokegoapi.exceptions.LoginFailedException;
+import com.pokegoapi.exceptions.RemoteServerException;
+import com.pokegoapi.main.ServerRequest;
 import lombok.Getter;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 
 public class Inventories {
@@ -52,11 +60,16 @@ public class Inventories {
 	@Getter
 	private Pokedex pokedex;
 	@Getter
-	private final List<EggIncubator> incubators = new ArrayList<>();
+	private final List<EggIncubator> incubators = Collections.synchronizedList(new ArrayList<EggIncubator>());
 	@Getter
 	private Hatchery hatchery;
 	@Getter
 	private long lastInventoryUpdate = 0;
+
+	private Map<ItemId, AppliedItem> appliedItems = new HashMap<>();
+
+	@Getter
+	private final Object lock = new Object();
 
 	/**
 	 * Creates Inventories and initializes content.
@@ -66,7 +79,7 @@ public class Inventories {
 	public Inventories(PokemonGo api) {
 		this.api = api;
 		itemBag = new ItemBag(api);
-		pokebank = new PokeBank();
+		pokebank = new PokeBank(api);
 		candyjar = new CandyJar(api);
 		pokedex = new Pokedex();
 		hatchery = new Hatchery(api);
@@ -75,28 +88,35 @@ public class Inventories {
 	/**
 	 * Updates the inventories with latest data.
 	 *
-	 * @throws LoginFailedException  the login failed exception
+	 * @return the response to the update message
+	 * @throws LoginFailedException the login failed exception
 	 * @throws RemoteServerException the remote server exception
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
-	public void updateInventories() throws LoginFailedException, RemoteServerException {
-		updateInventories(false);
+	public GetInventoryResponse updateInventories() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
+		return updateInventories(false);
 	}
 
 	/**
 	 * Updates the inventories with the latest data.
 	 *
 	 * @param forceUpdate For a full update if true
-	 * @throws LoginFailedException  the login failed exception
+	 * @return the response to the update message
+	 * @throws LoginFailedException the login failed exception
 	 * @throws RemoteServerException the remote server exception
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
-	public void updateInventories(boolean forceUpdate) throws LoginFailedException, RemoteServerException {
+	public GetInventoryResponse updateInventories(boolean forceUpdate)
+			throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		if (forceUpdate) {
 			lastInventoryUpdate = 0;
 			itemBag.reset();
 			pokebank.reset();
 			candyjar.reset();
 			pokedex.reset();
-			incubators.clear();
+			synchronized (this.lock) {
+				incubators.clear();
+			}
 			hatchery.reset();
 		}
 		GetInventoryMessage invReqMsg = GetInventoryMessage.newBuilder()
@@ -112,7 +132,7 @@ public class Inventories {
 			throw new RemoteServerException(e);
 		}
 
-		updateInventories(response);
+		return response;
 	}
 
 	/**
@@ -121,17 +141,20 @@ public class Inventories {
 	 * @param response the get inventory response
 	 */
 	public void updateInventories(GetInventoryResponse response) {
+		lastInventoryUpdate = api.currentTimeMillis();
+
 		for (InventoryItemOuterClass.InventoryItem inventoryItem
 				: response.getInventoryDelta().getInventoryItemsList()) {
 			InventoryItemDataOuterClass.InventoryItemData itemData = inventoryItem.getInventoryItemData();
 
 			// hatchery
-			if (itemData.getPokemonData().getPokemonId() == PokemonId.MISSINGNO && itemData.getPokemonData().getIsEgg()) {
-				hatchery.addEgg(new EggPokemon(itemData.getPokemonData()));
+			PokemonData pokemonData = itemData.getPokemonData();
+			if (pokemonData.getPokemonId() == PokemonId.MISSINGNO && pokemonData.getIsEgg()) {
+				hatchery.addEgg(new EggPokemon(pokemonData));
 			}
 
 			// pokebank
-			if (itemData.getPokemonData().getPokemonId() != PokemonId.MISSINGNO) {
+			if (pokemonData.getPokemonId() != PokemonId.MISSINGNO) {
 				pokebank.addPokemon(new Pokemon(api, inventoryItem.getInventoryItemData().getPokemonData()));
 			}
 
@@ -139,7 +162,9 @@ public class Inventories {
 			if (itemData.getItem().getItemId() != ItemId.UNRECOGNIZED
 					&& itemData.getItem().getItemId() != ItemId.ITEM_UNKNOWN) {
 				ItemData item = itemData.getItem();
-				itemBag.addItem(new Item(item));
+				if (item.getCount() > 0) {
+					itemBag.addItem(new Item(api, item, itemBag));
+				}
 			}
 
 			// candyjar
@@ -161,12 +186,40 @@ public class Inventories {
 			}
 
 			if (itemData.hasEggIncubators()) {
-				for (EggIncubatorOuterClass.EggIncubator incubator : itemData.getEggIncubators().getEggIncubatorList()) {
-					incubators.add(new EggIncubator(api, incubator));
+				EggIncubators eggIncubators = itemData.getEggIncubators();
+				for (EggIncubatorOuterClass.EggIncubator incubator : eggIncubators.getEggIncubatorList()) {
+					EggIncubator eggIncubator = new EggIncubator(api, incubator);
+					synchronized (this.lock) {
+						incubators.remove(eggIncubator);
+						incubators.add(eggIncubator);
+					}
 				}
 			}
 
-			lastInventoryUpdate = api.currentTimeMillis();
+			if (itemData.hasAppliedItems()) {
+				AppliedItems appliedItems = itemData.getAppliedItems();
+				for (AppliedItem appliedItem : appliedItems.getItemList()) {
+					this.appliedItems.put(appliedItem.getItemId(), appliedItem);
+				}
+			}
+
+			Set<ItemId> stale = new HashSet<>();
+			for (Map.Entry<ItemId, AppliedItem> entry : appliedItems.entrySet()) {
+				ItemId itemId = entry.getKey();
+				AppliedItem applied = entry.getValue();
+				if (api.currentTimeMillis() >= applied.getExpireMs()) {
+					stale.add(itemId);
+				} else {
+					Item item = itemBag.getItem(itemId);
+					item.setApplied(applied);
+					itemBag.addItem(item);
+				}
+			}
+
+			for (ItemId item : stale) {
+				appliedItems.remove(item);
+				itemBag.getItem(item).removeApplied();
+			}
 		}
 	}
 }

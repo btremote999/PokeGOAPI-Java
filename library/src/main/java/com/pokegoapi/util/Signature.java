@@ -1,133 +1,120 @@
+/*
+ *     This program is free software: you can redistribute it and/or modify
+ *     it under the terms of the GNU General Public License as published by
+ *     the Free Software Foundation, either version 3 of the License, or
+ *     (at your option) any later version.
+ *
+ *     This program is distributed in the hope that it will be useful,
+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *     GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package com.pokegoapi.util;
 
-import POGOProtos.Networking.Envelopes.RequestEnvelopeOuterClass;
+import POGOProtos.Networking.Envelopes.RequestEnvelopeOuterClass.RequestEnvelope;
 import POGOProtos.Networking.Envelopes.SignatureOuterClass;
-import POGOProtos.Networking.Envelopes.Unknown6OuterClass;
-import POGOProtos.Networking.Envelopes.Unknown6OuterClass.Unknown6.Unknown2;
-import POGOProtos.Networking.Requests.RequestOuterClass;
-
+import POGOProtos.Networking.Platform.PlatformRequestTypeOuterClass.PlatformRequestType;
+import POGOProtos.Networking.Platform.Requests.SendEncryptedSignatureRequestOuterClass.SendEncryptedSignatureRequest;
 import com.google.protobuf.ByteString;
 import com.pokegoapi.api.PokemonGo;
-import com.pokegoapi.api.device.ActivityStatus;
 import com.pokegoapi.api.device.LocationFixes;
-import com.pokegoapi.api.device.SensorInfo;
+import com.pokegoapi.exceptions.RemoteServerException;
+import com.pokegoapi.exceptions.hash.HashException;
+import com.pokegoapi.util.hash.Hash;
+import com.pokegoapi.util.hash.HashProvider;
+import com.pokegoapi.util.hash.crypto.Crypto;
 
-import net.jpountz.xxhash.StreamingXXHash32;
-import net.jpountz.xxhash.StreamingXXHash64;
-import net.jpountz.xxhash.XXHashFactory;
-
+import java.util.List;
 import java.util.Random;
 
 public class Signature {
+	private static final Random RANDOM = new Random();
 
 	/**
 	 * Given a fully built request, set the signature correctly.
 	 *
-	 * @param api     the api
-	 * @param builder the requestenvelop builder
+	 * @param api the api
+	 * @param builder the RequestEnvelope builder
+	 * @throws RemoteServerException if an invalid request is sent
+	 * @throws HashException if hashing fails
 	 */
-	public static void setSignature(PokemonGo api, RequestEnvelopeOuterClass.RequestEnvelope.Builder builder) {
+	public static void setSignature(PokemonGo api, RequestEnvelope.Builder builder)
+			throws RemoteServerException, HashException {
 		if (builder.getAuthTicket() == null) {
-			//System.out.println("Ticket == null");
 			return;
 		}
 
+
+		byte[] authTicket = builder.getAuthTicket().toByteArray();
+
+		if (authTicket.length == 0) {
+			return;
+		}
+
+
+		byte[][] requestData = new byte[builder.getRequestsCount()][];
+		for (int i = 0; i < builder.getRequestsCount(); i++) {
+			requestData[i] = builder.getRequests(i).toByteArray();
+		}
+
+		double latitude = api.getLatitude();
+		double longitude = api.getLongitude();
+		double accuracy = api.getAccuracy();
+
+		if (Double.isNaN(latitude)) {
+			latitude = 0.0;
+		}
+		if (Double.isNaN(longitude)) {
+			longitude = 0.0;
+		}
+		if (Double.isNaN(accuracy)) {
+			accuracy = 0.0;
+		}
+
 		long currentTime = api.currentTimeMillis();
+		byte[] sessionHash = api.getSessionHash();
+		HashProvider provider = api.getHashProvider();
+		Hash hash = provider.provide(currentTime, latitude, longitude, accuracy, authTicket, sessionHash, requestData);
+		Crypto crypto = provider.getCrypto();
 
-		byte[] authTicketBA = builder.getAuthTicket().toByteArray();
-
-		/*
-			Todo : reuse this later when we know the input
-			byte[] unknown = "b8fa9757195897aae92c53dbcf8a60fb3d86d745".getBytes();
-			XXHashFactory factory = XXHashFactory.safeInstance();
-			StreamingXXHash64 xx64 = factory.newStreamingHash64(0x88533787);
-			xx64.update(unknown, 0, unknown.length);
-			long unknown25 = xx64.getValue();
-		*/
-
-		Random random = new Random();
-
-		SignatureOuterClass.Signature.Builder sigBuilder = SignatureOuterClass.Signature.newBuilder()
-				.setLocationHash1(getLocationHash1(api, authTicketBA))
-				.setLocationHash2(getLocationHash2(api))
-				.setSessionHash(ByteString.copyFrom(api.getSessionHash()))
-				.setTimestamp(api.currentTimeMillis())
-				.setTimestampSinceStart(currentTime - api.getStartTime())
+		long timeSinceStart = currentTime - api.getStartTime();
+		SignatureOuterClass.Signature.Builder signatureBuilder = SignatureOuterClass.Signature.newBuilder()
+				.setLocationHash1(hash.getLocationAuthHash())
+				.setLocationHash2(hash.getLocationHash())
+				.setTimestamp(currentTime)
+				.setTimestampSinceStart(timeSinceStart)
 				.setDeviceInfo(api.getDeviceInfo())
-				.setActivityStatus(api.getActivitySignature(random))
-				.addAllLocationFix(LocationFixes.getDefault(api, builder, currentTime, random))
-				.setUnknown25(Constant.UNK25);
+				.setActivityStatus(api.getActivitySignature(RANDOM))
+				.addAllLocationFix(LocationFixes.getDefault(api, builder, currentTime, RANDOM))
+				.setSessionHash(ByteString.copyFrom(sessionHash))
+				.setUnknown25(provider.getUNK25());
 
-		SignatureOuterClass.Signature.SensorInfo sensorInfo = api.getSensorSignature(currentTime, random);
+		SignatureOuterClass.Signature.SensorInfo sensorInfo = api.getSensorSignature(currentTime, RANDOM);
 		if (sensorInfo != null) {
-			sigBuilder.setSensorInfo(sensorInfo);
+			signatureBuilder.addSensorInfo(sensorInfo);
 		}
 
-		for (RequestOuterClass.Request serverRequest : builder.getRequestsList()) {
-			byte[] request = serverRequest.toByteArray();
-			sigBuilder.addRequestHash(getRequestHash(authTicketBA, request));
+		List<Long> requestHashes = hash.getRequestHashes();
+		for (int i = 0; i < builder.getRequestsCount(); i++) {
+			signatureBuilder.addRequestHash(requestHashes.get(i));
 		}
 
-		// TODO: Call encrypt function on this
-		byte[] uk2 = sigBuilder.build().toByteArray();
-		byte[] iv = new byte[32];
-		new Random().nextBytes(iv);
-		byte[] encrypted = Crypto.encrypt(uk2, iv).toByteBuffer().array();
-		Unknown6OuterClass.Unknown6 uk6 = Unknown6OuterClass.Unknown6.newBuilder()
-				.setRequestType(6)
-				.setUnknown2(Unknown2.newBuilder().setEncryptedSignature(ByteString.copyFrom(encrypted))).build();
-		builder.addUnknown6(uk6);
-	}
+		SignatureOuterClass.Signature signature = signatureBuilder.build();
+		byte[] signatureByteArray = signature.toByteArray();
+		byte[] encrypted = crypto.encrypt(signatureByteArray, timeSinceStart).toByteBuffer().array();
 
-	private static byte[] getBytes(double input) {
-		long rawDouble = Double.doubleToRawLongBits(input);
-		return new byte[]{
-				(byte) (rawDouble >>> 56),
-				(byte) (rawDouble >>> 48),
-				(byte) (rawDouble >>> 40),
-				(byte) (rawDouble >>> 32),
-				(byte) (rawDouble >>> 24),
-				(byte) (rawDouble >>> 16),
-				(byte) (rawDouble >>> 8),
-				(byte) rawDouble
-		};
-	}
+		ByteString signatureBytes = SendEncryptedSignatureRequest.newBuilder()
+				.setEncryptedSignature(ByteString.copyFrom(encrypted)).build()
+				.toByteString();
 
-	private static int getLocationHash1(PokemonGo api, byte[] authTicket) {
-		XXHashFactory factory = XXHashFactory.safeInstance();
-		StreamingXXHash32 xx32 = factory.newStreamingHash32(0x1B845238);
-		xx32.update(authTicket, 0, authTicket.length);
-		byte[] bytes = new byte[8 * 3];
-
-		System.arraycopy(getBytes(api.getLatitude()), 0, bytes, 0, 8);
-		System.arraycopy(getBytes(api.getLongitude()), 0, bytes, 8, 8);
-		System.arraycopy(getBytes(api.getAltitude()), 0, bytes, 16, 8);
-
-		xx32 = factory.newStreamingHash32(xx32.getValue());
-		xx32.update(bytes, 0, bytes.length);
-		return xx32.getValue();
-	}
-
-	private static int getLocationHash2(PokemonGo api) {
-		XXHashFactory factory = XXHashFactory.safeInstance();
-		byte[] bytes = new byte[8 * 3];
-
-		System.arraycopy(getBytes(api.getLatitude()), 0, bytes, 0, 8);
-		System.arraycopy(getBytes(api.getLongitude()), 0, bytes, 8, 8);
-		System.arraycopy(getBytes(api.getAltitude()), 0, bytes, 16, 8);
-
-		StreamingXXHash32 xx32 = factory.newStreamingHash32(0x1B845238);
-		xx32.update(bytes, 0, bytes.length);
-
-		return xx32.getValue();
-	}
-
-	private static long getRequestHash(byte[] authTicket, byte[] request) {
-		XXHashFactory factory = XXHashFactory.safeInstance();
-		StreamingXXHash64 xx64 = factory.newStreamingHash64(0x1B845238);
-		xx64.update(authTicket, 0, authTicket.length);
-		xx64 = factory.newStreamingHash64(xx64.getValue());
-		xx64.update(request, 0, request.length);
-		return xx64.getValue();
+		RequestEnvelope.PlatformRequest platformRequest = RequestEnvelope.PlatformRequest.newBuilder()
+				.setType(PlatformRequestType.SEND_ENCRYPTED_SIGNATURE)
+				.setRequestMessage(signatureBytes)
+				.build();
+		builder.addPlatformRequests(platformRequest);
 	}
 }

@@ -13,14 +13,22 @@
  *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.pokegoapi.util;
+package com.pokegoapi.exceptions.hash;
 
-/**
- * Created by iGio90 on 27/08/16.
- */
+public class HashException extends Exception {
+	public HashException() {
+		super();
+	}
 
-public class Constant {
-	public static final int APP_VERSION = 3500;
+	public HashException(String reason) {
+		super(reason);
+	}
 
-	public static final long UNK25 = 7363665268261373700L;
+	public HashException(Throwable exception) {
+		super(exception);
+	}
+
+	public HashException(String reason, Throwable exception) {
+		super(reason, exception);
+	}
 }

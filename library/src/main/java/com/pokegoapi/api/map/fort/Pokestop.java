@@ -15,18 +15,6 @@
 
 package com.pokegoapi.api.map.fort;
 
-import com.google.protobuf.ByteString;
-import com.google.protobuf.InvalidProtocolBufferException;
-import com.pokegoapi.api.PokemonGo;
-import com.pokegoapi.exceptions.AsyncRemoteServerException;
-import com.pokegoapi.exceptions.LoginFailedException;
-import com.pokegoapi.exceptions.RemoteServerException;
-import com.pokegoapi.google.common.geometry.S2LatLng;
-import com.pokegoapi.main.AsyncServerRequest;
-import com.pokegoapi.util.AsyncHelper;
-
-import java.util.List;
-
 import POGOProtos.Inventory.Item.ItemIdOuterClass;
 import POGOProtos.Map.Fort.FortDataOuterClass;
 import POGOProtos.Map.Fort.FortModifierOuterClass;
@@ -37,9 +25,22 @@ import POGOProtos.Networking.Requests.RequestTypeOuterClass;
 import POGOProtos.Networking.Responses.AddFortModifierResponseOuterClass;
 import POGOProtos.Networking.Responses.FortDetailsResponseOuterClass;
 import POGOProtos.Networking.Responses.FortSearchResponseOuterClass;
+import com.google.protobuf.ByteString;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.pokegoapi.api.PokemonGo;
+import com.pokegoapi.api.listener.PokestopListener;
+import com.pokegoapi.exceptions.AsyncRemoteServerException;
+import com.pokegoapi.exceptions.CaptchaActiveException;
+import com.pokegoapi.exceptions.LoginFailedException;
+import com.pokegoapi.exceptions.RemoteServerException;
+import com.pokegoapi.google.common.geometry.S2LatLng;
+import com.pokegoapi.main.AsyncServerRequest;
+import com.pokegoapi.util.AsyncHelper;
 import lombok.Getter;
 import rx.Observable;
 import rx.functions.Func1;
+
+import java.util.List;
 
 /**
  * Created by mjmfighter on 7/20/2016.
@@ -55,7 +56,7 @@ public class Pokestop {
 	/**
 	 * Instantiates a new Pokestop.
 	 *
-	 * @param api      the api
+	 * @param api the api
 	 * @param fortData the fort data
 	 */
 	public Pokestop(PokemonGo api, FortDataOuterClass.FortData fortData) {
@@ -155,7 +156,14 @@ public class Pokestop {
 							throw new AsyncRemoteServerException(e);
 						}
 						cooldownCompleteTimestampMs = response.getCooldownCompleteTimestampMs();
-						return new PokestopLootResult(response);
+						PokestopLootResult lootResult = new PokestopLootResult(response);
+						List<PokestopListener> listeners = api.getListeners(PokestopListener.class);
+						for (PokestopListener listener : listeners) {
+							// listener.onLoot(lootResult);
+							// return the pokestop, also change in listener
+							listener.onLoot(lootResult, Pokestop.this);
+						}
+						return lootResult;
 					}
 				});
 	}
@@ -164,10 +172,11 @@ public class Pokestop {
 	 * Loots a pokestop for pokeballs and other items.
 	 *
 	 * @return PokestopLootResult
-	 * @throws LoginFailedException  if login failed
+	 * @throws LoginFailedException if login failed
 	 * @throws RemoteServerException if the server failed to respond
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
-	public PokestopLootResult loot() throws LoginFailedException, RemoteServerException {
+	public PokestopLootResult loot() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return AsyncHelper.toBlocking(lootAsync());
 	}
 
@@ -203,10 +212,12 @@ public class Pokestop {
 	 * Adds a modifier to this pokestop. (i.e. add a lure module)
 	 *
 	 * @param item the modifier to add to this pokestop
-	 * @throws LoginFailedException  if login failed
+	 * @throws LoginFailedException if login failed
 	 * @throws RemoteServerException if the server failed to respond or the modifier could not be added to this pokestop
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
-	public void addModifier(ItemIdOuterClass.ItemId item) throws LoginFailedException, RemoteServerException {
+	public void addModifier(ItemIdOuterClass.ItemId item)
+			throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		AsyncHelper.toBlocking(addModifierAsync(item));
 	}
 
@@ -242,10 +253,11 @@ public class Pokestop {
 	 * Get more detailed information about a pokestop.
 	 *
 	 * @return FortDetails
-	 * @throws LoginFailedException  if login failed
+	 * @throws LoginFailedException if login failed
 	 * @throws RemoteServerException if the server failed to respond
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
-	public FortDetails getDetails() throws LoginFailedException, RemoteServerException {
+	public FortDetails getDetails() throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		return AsyncHelper.toBlocking(getDetailsAsync());
 	}
 
@@ -267,7 +279,7 @@ public class Pokestop {
 	public boolean hasLure() {
 		try {
 			return hasLure(false);
-		} catch (LoginFailedException | RemoteServerException e) {
+		} catch (LoginFailedException | RemoteServerException | CaptchaActiveException e) {
 			// No need
 		}
 
@@ -279,10 +291,12 @@ public class Pokestop {
 	 *
 	 * @param updateFortDetails to make a new request and get updated lured status
 	 * @return lure status
-	 * @throws LoginFailedException  If login failed.
+	 * @throws LoginFailedException If login failed.
 	 * @throws RemoteServerException If server communications failed.
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
-	public boolean hasLure(boolean updateFortDetails) throws LoginFailedException, RemoteServerException {
+	public boolean hasLure(boolean updateFortDetails)
+			throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		if (updateFortDetails) {
 			List<FortModifierOuterClass.FortModifier> modifiers = getDetails().getModifier();
 			for (FortModifierOuterClass.FortModifier modifier : modifiers) {
@@ -296,5 +310,15 @@ public class Pokestop {
 
 		return fortData.getActiveFortModifierList()
 				.contains(ItemIdOuterClass.ItemId.ITEM_TROY_DISK);
+	}
+
+	@Override
+	public int hashCode() {
+		return getId().hashCode();
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		return obj instanceof Pokestop && ((Pokestop) obj).getId().equals(getId());
 	}
 }

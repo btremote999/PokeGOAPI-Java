@@ -13,34 +13,16 @@
  *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.pokegoapi.api.pokemon;
+package com.pokegoapi.exceptions;
 
-import POGOProtos.Enums.PokemonMoveOuterClass.PokemonMove;
 import lombok.Getter;
-import lombok.Setter;
 
-public class PokemonMoveMeta {
+public class CaptchaActiveException extends Exception {
+	@Getter
+	private String captcha;
 
-	@Getter
-	@Setter
-	private PokemonMove move;
-	@Getter
-	@Setter
-	private PokemonType type;
-	@Getter
-	@Setter
-	private int power;
-	@Getter
-	@Setter
-	private int accuracy;
-	@Getter
-	@Setter
-	private double critChance;
-	@Getter
-	@Setter
-	private int time;
-	@Getter
-	@Setter
-	private int energy;
-
+	public CaptchaActiveException(AsyncCaptchaActiveException exception) {
+		super(exception.getMessage(), exception);
+		this.captcha = exception.getCaptcha();
+	}
 }

@@ -39,4 +39,13 @@ public class Point implements MapPoint {
 		this.latitude = spawnpoint.getLatitude();
 		this.longitude = spawnpoint.getLongitude();
 	}
+
+	@Override
+	public String toString() {
+		StringBuilder builder = new StringBuilder();
+		builder.append(this.latitude);
+		builder.append(", ");
+		builder.append(this.longitude);
+		return builder.toString();
+	}
 }

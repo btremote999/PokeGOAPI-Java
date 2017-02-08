@@ -18,17 +18,20 @@ package com.pokegoapi.main;
 import POGOProtos.Networking.Envelopes.AuthTicketOuterClass.AuthTicket;
 import POGOProtos.Networking.Envelopes.RequestEnvelopeOuterClass.RequestEnvelope;
 import POGOProtos.Networking.Envelopes.ResponseEnvelopeOuterClass.ResponseEnvelope;
-
+import POGOProtos.Networking.Requests.RequestTypeOuterClass;
+import POGOProtos.Networking.Requests.RequestTypeOuterClass.RequestType;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.PokemonGo;
+import com.pokegoapi.exceptions.AsyncCaptchaActiveException;
 import com.pokegoapi.exceptions.AsyncPokemonGoException;
+import com.pokegoapi.exceptions.CaptchaActiveException;
 import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
+import com.pokegoapi.exceptions.hash.HashException;
 import com.pokegoapi.util.AsyncHelper;
 import com.pokegoapi.util.Log;
 import com.pokegoapi.util.Signature;
-
 import okhttp3.OkHttpClient;
 import okhttp3.RequestBody;
 import okhttp3.Response;
@@ -38,33 +41,37 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class RequestHandler implements Runnable {
 	private static final String TAG = RequestHandler.class.getSimpleName();
 	private final PokemonGo api;
 	private final Thread asyncHttpThread;
 	private final BlockingQueue<AsyncServerRequest> workQueue = new LinkedBlockingQueue<>();
-	private final Map<Long, ResultOrException> resultMap = new HashMap<>();
+	private final Map<Long, ResultOrException> resultMap = new ConcurrentHashMap<>();
 	private String apiEndpoint;
 	private OkHttpClient client;
-	private Long requestId = new Random().nextLong();
+	private AtomicLong requestId = new AtomicLong(System.currentTimeMillis());
+	private Random random;
 
 	/**
 	 * Instantiates a new Request handler.
 	 *
-	 * @param api    the api
+	 * @param api the api
 	 * @param client the client
 	 */
 	public RequestHandler(PokemonGo api, OkHttpClient client) {
@@ -74,6 +81,7 @@ public class RequestHandler implements Runnable {
 		asyncHttpThread = new Thread(this, "Async HTTP Thread");
 		asyncHttpThread.setDaemon(true);
 		asyncHttpThread.start();
+		random = new Random();
 	}
 
 	/**
@@ -144,12 +152,18 @@ public class RequestHandler implements Runnable {
 	 *
 	 * @param serverRequests list of ServerRequests to be sent
 	 * @throws RemoteServerException the remote server exception
-	 * @throws LoginFailedException  the login failed exception
+	 * @throws LoginFailedException the login failed exception
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
 	 */
-	public void sendServerRequests(ServerRequest... serverRequests) throws RemoteServerException, LoginFailedException {
+	public void sendServerRequests(ServerRequest... serverRequests)
+			throws RemoteServerException, LoginFailedException, CaptchaActiveException {
+		if (api.hasChallenge()) {
+			throw new CaptchaActiveException(new AsyncCaptchaActiveException("Captcha active! Cannot send requests!"));
+		}
 		List<Observable<ByteString>> observables = new ArrayList<>(serverRequests.length);
 		for (ServerRequest request : serverRequests) {
-			AsyncServerRequest asyncServerRequest = new AsyncServerRequest(request.getType(), request.getRequest());
+			AsyncServerRequest asyncServerRequest = new AsyncServerRequest(request.getType(), request.getRequest())
+					.withCommons(request.isRequireCommon()).exclude(request.getExclude());
 			observables.add(sendAsyncServerRequests(asyncServerRequest));
 		}
 		for (int i = 0; i != serverRequests.length; i++) {
@@ -162,10 +176,12 @@ public class RequestHandler implements Runnable {
 	 *
 	 * @param serverRequests list of ServerRequests to be sent
 	 * @throws RemoteServerException the remote server exception
-	 * @throws LoginFailedException  the login failed exception
+	 * @throws LoginFailedException the login failed exception
+	 * @throws CaptchaActiveException if a captcha is active and the message can't be sent
+	 * @throws HashException if hashing fails
 	 */
 	private AuthTicket internalSendServerRequests(AuthTicket authTicket, ServerRequest... serverRequests)
-			throws RemoteServerException, LoginFailedException {
+			throws RemoteServerException, CaptchaActiveException, LoginFailedException, HashException {
 		AuthTicket newAuthTicket = authTicket;
 		if (serverRequests.length == 0) {
 			return authTicket;
@@ -214,21 +230,25 @@ public class RequestHandler implements Runnable {
 				newAuthTicket = responseEnvelop.getAuthTicket();
 			}
 
-			if (responseEnvelop.getStatusCode() == 102) {
-				throw new LoginFailedException(String.format("Invalid Auth status code recieved, token not refreshed? %s %s",
-						responseEnvelop.getApiUrl(), responseEnvelop.getError()));
-			} else if (responseEnvelop.getStatusCode() == 53) {
-				// 53 means that the api_endpoint was not correctly set, should be at this point, though, so redo the request
+			if (responseEnvelop.getStatusCode() == ResponseEnvelope.StatusCode.INVALID_AUTH_TOKEN) {
+				String msg = String.format("Invalid Auth status code received, token not refreshed? %s %s",
+						responseEnvelop.getApiUrl(), responseEnvelop.getError());
+				throw new LoginFailedException(msg);
+			} else if (responseEnvelop.getStatusCode() == ResponseEnvelope.StatusCode.REDIRECT) {
+				// API_ENDPOINT was not correctly set, should be at this point, though, so redo the request
 				return internalSendServerRequests(newAuthTicket, serverRequests);
-			} else if (responseEnvelop.getStatusCode() == 3) {
-				throw new RemoteServerException("Your account may be banned! please try from the official client.");
+			} else if (responseEnvelop.getStatusCode() == ResponseEnvelope.StatusCode.BAD_REQUEST) {
+				if (api.getPlayerProfile().isBanned()) {
+					throw new LoginFailedException("Cannot send request, your account has been banned!");
+				} else {
+					throw new RemoteServerException("A bad request was sent!");
+				}
 			}
 
-
-			/**
+			/*
 			 * map each reply to the numeric response,
 			 * ie first response = first request and send back to the requests to toBlocking.
-			 * */
+			 */
 			int count = 0;
 			for (ByteString payload : responseEnvelop.getReturnsList()) {
 				ServerRequest serverReq = serverRequests[count];
@@ -242,7 +262,7 @@ public class RequestHandler implements Runnable {
 			}
 		} catch (IOException e) {
 			throw new RemoteServerException(e);
-		} catch (RemoteServerException e) {
+		} catch (RemoteServerException | LoginFailedException e) {
 			// catch it, so the auto-close of resources triggers, but don't wrap it in yet another RemoteServer Exception
 			throw e;
 		}
@@ -250,7 +270,7 @@ public class RequestHandler implements Runnable {
 	}
 
 	private void resetBuilder(RequestEnvelope.Builder builder, AuthTicket authTicket)
-			throws LoginFailedException, RemoteServerException {
+			throws LoginFailedException, CaptchaActiveException, RemoteServerException {
 		builder.setStatusCode(2);
 		builder.setRequestId(getRequestId());
 		//builder.setAuthInfo(api.getAuthInfo());
@@ -262,14 +282,14 @@ public class RequestHandler implements Runnable {
 			Log.d(TAG, "Authenticated with static token");
 			builder.setAuthInfo(api.getAuthInfo());
 		}
-		builder.setMsSinceLastLocationfix(989);
+		builder.setMsSinceLastLocationfix(random.nextInt(1651) + 149);
 		builder.setLatitude(api.getLatitude());
 		builder.setLongitude(api.getLongitude());
-		builder.setAltitude(api.getAltitude());
+		builder.setAccuracy(api.getAccuracy());
 	}
 
 	private Long getRequestId() {
-		return ++requestId;
+		return requestId.getAndIncrement();
 	}
 
 	@Override
@@ -278,7 +298,7 @@ public class RequestHandler implements Runnable {
 		AuthTicket authTicket = null;
 		while (true) {
 			try {
-				Thread.sleep(350);
+				Thread.sleep(1000);
 			} catch (InterruptedException e) {
 				throw new AsyncPokemonGoException("System shutdown", e);
 			}
@@ -288,19 +308,56 @@ public class RequestHandler implements Runnable {
 
 			workQueue.drainTo(requests);
 
-			ArrayList<ServerRequest> serverRequests = new ArrayList();
 			boolean addCommon = false;
+
+			ArrayList<ServerRequest> serverRequests = new ArrayList<>();
+			Map<ServerRequest, AsyncServerRequest> requestMap = new HashMap<>();
+			Set<RequestType> exclude = new HashSet<>();
+
 			for (AsyncServerRequest request : requests) {
-				serverRequests.add(new ServerRequest(request.getType(), request.getRequest()));
-				if (request.isRequireCommonRequest())
-					addCommon = true;
+				exclude.addAll(request.getExclude());
 			}
 
-			ServerRequest[] commonRequests = new ServerRequest[0];
+			if (api.isLoggingIn() && api.hasChallenge()) {
+				exclude.add(RequestType.CHECK_CHALLENGE);
+			}
+
+			if (api.hasChallenge() && !api.isLoggingIn()) {
+				for (AsyncServerRequest request : requests) {
+					RequestTypeOuterClass.RequestType type = request.getType();
+					if (!exclude.contains(type)) {
+						if (type == RequestTypeOuterClass.RequestType.VERIFY_CHALLENGE
+								|| type == RequestType.CHECK_CHALLENGE) {
+							ServerRequest serverRequest = new ServerRequest(type, request.getRequest());
+							serverRequests.add(serverRequest);
+							requestMap.put(serverRequest, request);
+						} else {
+							AsyncCaptchaActiveException exception = new AsyncCaptchaActiveException(api.getChallengeURL());
+							ResultOrException error = ResultOrException.getError(exception);
+							resultMap.put(request.getId(), error);
+						}
+					}
+				}
+			} else {
+				for (AsyncServerRequest request : requests) {
+					if (!exclude.contains(request.getType())) {
+						ServerRequest serverRequest = new ServerRequest(request.getType(), request.getRequest());
+						serverRequests.add(serverRequest);
+						requestMap.put(serverRequest, request);
+						if (request.isRequireCommonRequest()) {
+							addCommon = true;
+						}
+					}
+				}
+			}
 
 			if (addCommon) {
-				commonRequests = CommonRequest.getCommonRequests(api);
-				Collections.addAll(serverRequests, commonRequests);
+				ServerRequest[] commonRequests = CommonRequests.getCommonRequests(api);
+				for (ServerRequest request : commonRequests) {
+					if (!exclude.contains(request.getType())) {
+						serverRequests.add(request);
+					}
+				}
 			}
 
 			ServerRequest[] arrayServerRequests = serverRequests.toArray(new ServerRequest[serverRequests.size()]);
@@ -308,25 +365,28 @@ public class RequestHandler implements Runnable {
 			try {
 				authTicket = internalSendServerRequests(authTicket, arrayServerRequests);
 
-				for (int i = 0; i != requests.size(); i++) {
+				for (ServerRequest request : serverRequests) {
+					AsyncServerRequest asyncRequest = requestMap.get(request);
 					try {
-						resultMap.put(requests.get(i).getId(), ResultOrException.getResult(arrayServerRequests[i].getData()));
+						ByteString data = request.getData();
+						if (asyncRequest != null) {
+							resultMap.put(asyncRequest.getId(), ResultOrException.getResult(data));
+						}
+						CommonRequests.queue(request.getType(), data);
 					} catch (InvalidProtocolBufferException e) {
-						resultMap.put(requests.get(i).getId(), ResultOrException.getError(e));
+						if (asyncRequest != null) {
+							resultMap.put(asyncRequest.getId(), ResultOrException.getError(e));
+						}
 					}
 				}
 
-				for (int i = 0; i != commonRequests.length; i++) {
-					try {
-						CommonRequest.parse(api, arrayServerRequests[requests.size() + i].getType(),
-								arrayServerRequests[requests.size() + i].getData());
-					} catch (InvalidProtocolBufferException e) {
-						//TODO: notify error even in case of common requests?
-					}
+				try {
+					CommonRequests.handleQueue(api);
+				} catch (InvalidProtocolBufferException e) {
+					continue;
 				}
-
 				continue;
-			} catch (RemoteServerException | LoginFailedException e) {
+			} catch (RemoteServerException | LoginFailedException | CaptchaActiveException | HashException e) {
 				for (AsyncServerRequest request : requests) {
 					resultMap.put(request.getId(), ResultOrException.getError(e));
 				}

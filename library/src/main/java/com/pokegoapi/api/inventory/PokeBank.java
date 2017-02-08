@@ -15,28 +15,54 @@
 
 package com.pokegoapi.api.inventory;
 
+import POGOProtos.Enums.PokemonFamilyIdOuterClass.PokemonFamilyId;
+import POGOProtos.Enums.PokemonIdOuterClass;
+import POGOProtos.Inventory.CandyOuterClass.Candy;
+import POGOProtos.Inventory.InventoryItemDataOuterClass.InventoryItemData;
+import POGOProtos.Inventory.InventoryItemOuterClass.InventoryItem;
+import POGOProtos.Networking.Requests.Messages.GetInventoryMessageOuterClass.GetInventoryMessage;
+import POGOProtos.Networking.Requests.Messages.ReleasePokemonMessageOuterClass.ReleasePokemonMessage;
+import POGOProtos.Networking.Requests.RequestTypeOuterClass.RequestType;
+import POGOProtos.Networking.Responses.GetInventoryResponseOuterClass.GetInventoryResponse;
+import POGOProtos.Networking.Responses.ReleasePokemonResponseOuterClass.ReleasePokemonResponse;
+import POGOProtos.Networking.Responses.ReleasePokemonResponseOuterClass.ReleasePokemonResponse.Result;
 import com.annimon.stream.Collectors;
 import com.annimon.stream.Stream;
 import com.annimon.stream.function.Predicate;
+import com.google.protobuf.InvalidProtocolBufferException;
+import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.api.pokemon.Pokemon;
+import com.pokegoapi.exceptions.CaptchaActiveException;
+import com.pokegoapi.exceptions.LoginFailedException;
+import com.pokegoapi.exceptions.RemoteServerException;
+import com.pokegoapi.main.ServerRequest;
+import lombok.Getter;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
-
-import POGOProtos.Enums.PokemonIdOuterClass;
-import lombok.Getter;
-
+import java.util.Map;
 
 public class PokeBank {
 	@Getter
 	private final List<Pokemon> pokemons = Collections.synchronizedList(new ArrayList<Pokemon>());
+	@Getter
+	private final Object lock = new Object();
+	@Getter
+	private final PokemonGo api;
 
-	public PokeBank() {
+	public PokeBank(PokemonGo api) {
+		this.api = api;
 	}
 
+	/**
+	 * Resets the Pokebank and removes all pokemon
+	 */
 	public void reset() {
-		pokemons.clear();
+		synchronized (this.lock) {
+			pokemons.clear();
+		}
 	}
 
 	/**
@@ -45,14 +71,16 @@ public class PokeBank {
 	 * @param pokemon Pokemon to add to the inventory
 	 */
 	public void addPokemon(final Pokemon pokemon) {
-		List<Pokemon> alreadyAdded = Stream.of(pokemons).filter(new Predicate<Pokemon>() {
-			@Override
-			public boolean test(Pokemon testPokemon) {
-				return pokemon.getId() == testPokemon.getId();
+		synchronized (this.lock) {
+			List<Pokemon> alreadyAdded = Stream.of(pokemons).filter(new Predicate<Pokemon>() {
+				@Override
+				public boolean test(Pokemon testPokemon) {
+					return pokemon.getId() == testPokemon.getId();
+				}
+			}).collect(Collectors.<Pokemon>toList());
+			if (alreadyAdded.size() < 1) {
+				pokemons.add(pokemon);
 			}
-		}).collect(Collectors.<Pokemon>toList());
-		if (alreadyAdded.size() < 1) {
-			pokemons.add(pokemon);
 		}
 	}
 
@@ -63,27 +91,34 @@ public class PokeBank {
 	 * @return the pokemon by pokemon id
 	 */
 	public List<Pokemon> getPokemonByPokemonId(final PokemonIdOuterClass.PokemonId id) {
-		return Stream.of(pokemons).filter(new Predicate<Pokemon>() {
-			@Override
-			public boolean test(Pokemon pokemon) {
-				return pokemon.getPokemonId().equals(id);
-			}
-		}).collect(Collectors.<Pokemon>toList());
+		synchronized (this.lock) {
+			return Stream.of(pokemons).filter(new Predicate<Pokemon>() {
+				@Override
+				public boolean test(Pokemon pokemon) {
+					return pokemon.getPokemonId().equals(id);
+				}
+			}).collect(Collectors.<Pokemon>toList());
+		}
 	}
 
 	/**
 	 * Remove pokemon.
 	 *
-	 * @param pokemon the pokemon
+	 * @param pokemon the pokemon to remove.
 	 */
 	public void removePokemon(final Pokemon pokemon) {
-		pokemons.clear();
-		pokemons.addAll(Stream.of(pokemons).filter(new Predicate<Pokemon>() {
-			@Override
-			public boolean test(Pokemon pokemn) {
-				return pokemn.getId() != pokemon.getId();
-			}
-		}).collect(Collectors.<Pokemon>toList()));
+		synchronized (this.lock) {
+			List<Pokemon> previous = new ArrayList<>();
+			previous.addAll(pokemons);
+
+			pokemons.clear();
+			pokemons.addAll(Stream.of(previous).filter(new Predicate<Pokemon>() {
+				@Override
+				public boolean test(Pokemon pokemn) {
+					return pokemn.getId() != pokemon.getId();
+				}
+			}).collect(Collectors.<Pokemon>toList()));
+		}
 	}
 
 	/**
@@ -93,11 +128,78 @@ public class PokeBank {
 	 * @return the pokemon
 	 */
 	public Pokemon getPokemonById(final Long id) {
-		for (Pokemon pokemon : pokemons) {
-			if (pokemon.getId() == id) {
-				return pokemon;
+		synchronized (this.lock) {
+			for (Pokemon pokemon : pokemons) {
+				if (pokemon.getId() == id) {
+					return pokemon;
+				}
 			}
 		}
 		return null;
+	}
+
+	/**
+	 * Releases multiple pokemon in a single request
+	 *
+	 * @param releasePokemon the pokemon to release
+	 * @return the amount of candies for each pokemon family
+	 * @throws CaptchaActiveException if a captcha is active and a message cannot be sent
+	 * @throws LoginFailedException the login fails
+	 * @throws RemoteServerException if the server errors
+	 */
+	public Map<PokemonFamilyId, Integer> releasePokemon(Pokemon... releasePokemon)
+			throws CaptchaActiveException, LoginFailedException, RemoteServerException {
+		ReleasePokemonMessage.Builder releaseBuilder = ReleasePokemonMessage.newBuilder();
+		for (Pokemon pokemon : releasePokemon) {
+			if (!pokemon.isDeployed()) {
+				releaseBuilder.addPokemonIds(pokemon.getId());
+			}
+		}
+		GetInventoryMessage inventoryMessage = GetInventoryMessage.newBuilder()
+				.setLastTimestampMs(api.getInventories().getLastInventoryUpdate())
+				.build();
+		ServerRequest inventoryRequest = new ServerRequest(RequestType.GET_INVENTORY, inventoryMessage);
+		ServerRequest releaseRequest = new ServerRequest(RequestType.RELEASE_POKEMON, releaseBuilder.build());
+		Map<PokemonFamilyId, Integer> lastCandies = new HashMap<>(api.getInventories().getCandyjar().getCandies());
+		api.getRequestHandler().sendServerRequests(releaseRequest, inventoryRequest);
+		try {
+			GetInventoryResponse inventoryResponse = GetInventoryResponse.parseFrom(inventoryRequest.getData());
+			ReleasePokemonResponse releaseResponse = ReleasePokemonResponse.parseFrom(releaseRequest.getData());
+			Map<PokemonFamilyId, Integer> candyCount = new HashMap<>();
+			if (releaseResponse.getResult() == Result.SUCCESS && inventoryResponse.getSuccess()) {
+				synchronized (this.lock) {
+					for (Pokemon pokemon : releasePokemon) {
+						this.pokemons.remove(pokemon);
+					}
+				}
+				for (Pokemon pokemon : releasePokemon) {
+					api.getInventories().getPokebank().removePokemon(pokemon);
+				}
+				List<InventoryItem> items = inventoryResponse.getInventoryDelta().getInventoryItemsList();
+				for (InventoryItem item : items) {
+					InventoryItemData data = item.getInventoryItemData();
+					if (data != null && data.hasCandy()) {
+						Candy candy = data.getCandy();
+						PokemonFamilyId family = candy.getFamilyId();
+						Integer lastCandy = lastCandies.get(family);
+						if (lastCandy == null) {
+							lastCandy = 0;
+						}
+						candyCount.put(family, candy.getCandy() - lastCandy);
+					}
+				}
+				api.getInventories().updateInventories(inventoryResponse);
+			}
+			return candyCount;
+		} catch (InvalidProtocolBufferException e) {
+			throw new RemoteServerException(e);
+		}
+	}
+
+	/**
+	 * @return the maximum amount of pokemon this pokebank can store
+	 */
+	public int getMaxStorage() {
+		return api.getPlayerProfile().getPlayerData().getMaxPokemonStorage();
 	}
 }

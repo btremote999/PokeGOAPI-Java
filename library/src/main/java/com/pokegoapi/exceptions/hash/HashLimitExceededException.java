@@ -13,12 +13,18 @@
  *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.pokegoapi.examples;
+package com.pokegoapi.exceptions.hash;
 
-/**
- * Created by court on 19/07/2016.
- */
-public class ExampleLoginDetails {
-	public static String LOGIN = "";
-	public static String PASSWORD = "";
+public class HashLimitExceededException extends HashException {
+	public HashLimitExceededException() {
+		super();
+	}
+
+	public HashLimitExceededException(String reason) {
+		super(reason);
+	}
+
+	public HashLimitExceededException(Throwable exception) {
+		super(exception);
+	}
 }
