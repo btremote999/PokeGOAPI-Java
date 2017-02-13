@@ -491,7 +491,7 @@ public class Battle {
 				.setPlayerLongitude(api.getLongitude());
 		while (queuedActions.size() > 0) {
 			ClientAction action = queuedActions.element();
-			if (action.getEndTime() < lastSendTime) {
+//			if (action.getEndTime() < lastSendTime) {
 				queuedActions.remove();
 				long activePokemon = activeAttacker.getPokemon().getId();
 				if (action.getPokemon() != null) {
@@ -511,9 +511,9 @@ public class Battle {
 					actionBuilder.setDamageWindowsEndTimestampMs(damageWindowEnd);
 				}
 				builder.addAttackActions(actionBuilder.build());
-			} else {
-				break;
-			}
+//			} else {
+//				break;
+//			}
 		}
 		if (lastRetrievedAction != null && sentActions) {
 			builder.setLastRetrievedAction(lastRetrievedAction);
