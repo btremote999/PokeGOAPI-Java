@@ -24,6 +24,7 @@ import com.pokegoapi.util.hash.crypto.PokeHashCrypto;
 import com.squareup.moshi.Moshi;
 import com.squareup.moshi.Moshi.Builder;
 
+import lombok.Setter;
 import net.iharder.Base64;
 
 import java.io.BufferedReader;
@@ -44,13 +45,17 @@ import lombok.Getter;
  */
 public class PokeHashProvider implements HashProvider {
     //	private static final String HASH_ENDPOINT = "https://pokehash.buddyauth.com/api/v121_2/hash";
-    private static final String HASH_ENDPOINT = "https://pokehash.buddyauth.com/api/v121_2/hash";
+	private static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v125/hash";
+    private static final String HASH_ENDPOINT = "https://pokehash.buddyauth.com/api/v125/hash";
 
-    private static final int VERSION = 5100;
-    private static final long UNK25 = -8832040574896607694L;
+	@Getter
+	@Setter
+	private String endpoint = DEFAULT_ENDPOINT;
 
-    private static final Moshi MOSHI = new Builder().build();
+	private static final int VERSION = 5500;
+	private static final long UNK25 = -9156899491064153954L;
 
+	private static final Moshi MOSHI = new Builder().build();
     private final String key;
     private final String endPoint;
     private final HashApiCounterListener listener;
@@ -59,6 +64,7 @@ public class PokeHashProvider implements HashProvider {
 	 * Hold the total amounts of requests per minute.
 	 */
 	@Getter
+	private final PokeHashKey key;
 	public static int totalRequests;
 	/**
 	 * Hold how many requests left per minute.
@@ -82,17 +88,22 @@ public class PokeHashProvider implements HashProvider {
 	 */
 	@Getter
 	public static long endOfMinute;
-
+	private final boolean awaitRequests;
 
 	/**
-     * Creates a PokeHashProvider with the given key
-     *
-     * @param key      the key for the PokeHash API
+     	 * Creates a PokeHashProvider with the given key
+     	 *
+     	 * @param key      the key for the PokeHash API
      * @param endPoint End Point of Poke Api Hash service
      * @param listener Listener of Hash Api response
-     */
-    public PokeHashProvider(String key, String endPoint, HashApiCounterListener listener) {
+	 * @param awaitRequest true if the API should, when the rate limit has been exceeded, wait until the current
+	 *     period ends, or false to throw a HashLimitExceededException
+	 */
+	public PokeHashProvider(PokeHashKey key, boolean awaitRequest, HashApiCounterListener listener) {
+    //public PokeHashProvider(String key, String endPoint, HashApiCounterListener listener) {
         this.key = key;
+		this.awaitRequests = awaitRequest;
+		if (key == null || key.getKey() == null) {
         this.endPoint = endPoint;
         this.listener = listener;
         if (key == null) {
@@ -101,6 +112,8 @@ public class PokeHashProvider implements HashProvider {
     }
 
 	/**
+	 * Provides a hash for the given arguments
+	 *
 	 * @param timestamp timestamp to hash
 	 * @param latitude latitude to hash
 	 * @param longitude longitude to hash
@@ -109,63 +122,52 @@ public class PokeHashProvider implements HashProvider {
 	 * @param sessionData session data to hash
 	 * @param requests request data to hash
 	 * @return the hash provider
-	 * @throws HashException - if can not login to the hash service
+	 * @throws HashException if an exception occurs while providing this hash
 	 */
-    @Override
-    public Crypto getCrypto() {
-        return PokeHashCrypto.POKE_HASH;
-    }
-
-    @Override
-    public int getHashVersion() {
-        return VERSION;
-    }
-
-    @Override
-    public long getUNK25() {
-        return UNK25;
-    }
-
-    @Override
-    public Hash provide(long timestamp, double latitude, double longitude, double altitude, byte[] authTicket,
+	@Override
+	public Hash provide(long timestamp, double latitude, double longitude, double altitude, byte[] authTicket,
 			byte[] sessionData, byte[][] requests) throws HashException {
-        Request request = new Request(latitude,
-                                      longitude,
-                                      altitude,
-                                      timestamp,
-                                      authTicket,
-                                      sessionData,
-                                      requests);
+		if (key.hasTested()) {
+			if (awaitRequests) {
+				try {
+					key.await();
+				} catch (InterruptedException e) {
+					throw new HashException(e);
+				}
+			} else {
+				long time = System.currentTimeMillis();
+				long timeLeft = time - key.getRatePeriodEnd();
+				if (key.getRequestsRemaining() <= 0 && timeLeft > 0) {
+					throw new HashLimitExceededException(
+							"Exceeded hash request limit! Period ends in " + timeLeft + "ms");
+				}
+			}
+		}
+
         try {
-//			HttpsURLConnection connection = (HttpsURLConnection) new URL(HASH_ENDPOINT).openConnection();
-            HttpsURLConnection connection = (HttpsURLConnection) new URL(this.endPoint).openConnection();
-            connection.setRequestMethod("POST");
-            connection.setRequestProperty("X-AuthToken", key);
-            connection.setRequestProperty("content-type", "application/json");
-            connection.setDoOutput(true);
+		Request request = new Request(latitude, longitude, altitude, timestamp, authTicket, sessionData, requests);
+		try {
+			HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+			connection.setRequestMethod("POST");
+			connection.setRequestProperty("X-AuthToken", key.getKey());
+			connection.setRequestProperty("content-type", "application/json");
+			connection.setRequestProperty("User-Agent", "PokeGOAPI-Java");
+			connection.setDoOutput(true);
 
-            String requestJSON = MOSHI.adapter(Request.class).toJson(request);
-            DataOutputStream out = new DataOutputStream(connection.getOutputStream());
-            out.writeBytes(requestJSON);
-            out.flush();
-            out.close();
+			String requestJSON = MOSHI.adapter(Request.class).toJson(request);
+			DataOutputStream out = new DataOutputStream(connection.getOutputStream());
+			out.writeBytes(requestJSON);
+			out.flush();
+			out.close();
 
-            int responseCode = connection.getResponseCode();
+			int responseCode = connection.getResponseCode();
 
-            String error = getError(connection);
+			this.key.setProperties(connection);
+
+			String error = getError(connection);
 
             switch (responseCode) {
                 case HttpURLConnection.HTTP_OK:
-					// Get the total number of requests per minute
-					totalRequests = Integer.parseInt(connection.getHeaderField("X-MaxRequestCount"));
-					// End of the cycle of the current minute
-					endOfMinute = Integer.parseInt(connection.getHeaderField("X-RatePeriodEnd"));
-					// How many requests left for the current minute
-					requestsLeft = Integer.parseInt(connection.getHeaderField("X-RateRequestsRemaining"));
-					// 60 always, in seconds, the calculus cycle.
-					rateLimitSeconds = Integer.parseInt(connection.getHeaderField("X-RateLimitSeconds"));
-					// when the Hash key is expired - Unix timestamp
-					expirationTimeStamp = Long.parseLong(connection.getHeaderField("X-AuthTokenExpiration"));
                     BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()));
                     StringBuilder builder = new StringBuilder();
                     String line;
@@ -230,6 +232,8 @@ public class PokeHashProvider implements HashProvider {
                     }
 
                     throw new HashLimitExceededException("Exceeded hash limit!");
+				case 404:
+					throw new HashException("Unknown hashing endpoint! \"" + this.endpoint + "\"");
                 default:
                     if (error.length() > 0) {
                         if (this.listener != null) {
@@ -276,9 +280,26 @@ public class PokeHashProvider implements HashProvider {
 
     public interface HashApiCounterListener {
         void hashFailed(long time_spend_ms, int err_no, String err_msg);
-
+	
         void hashSuccess(long time_spend_ms);
     }
+    
+    @Override
+	public int getHashVersion() {
+		return VERSION;
+	}
+
+	@Override
+	public Crypto getCrypto() {
+		return PokeHashCrypto.POKE_HASH;
+	}
+	
+	@Override
+	public long getUNK25() {
+		return UNK25;
+	}
+
+
 
     private static class Response {
         @Getter
