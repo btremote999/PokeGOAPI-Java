@@ -208,6 +208,10 @@ public class Battle {
 		}
 	}
 
+    public void end(){
+        // force end it !
+        active = false;
+    }
 	/**
 	 * Performs a tick for this battle
 	 *
@@ -284,17 +288,21 @@ public class Battle {
 				break;
 			}
 		}
-		active = results == null;
+
+        active = (results == null);
+
 		BattleState state = log.getState();
 		if (state != battleState) {
 			switch (state) {
 				case TIMED_OUT:
 					gym.clearDetails();
 					handler.onTimedOut(api, this);
+                    active = false;
 					break;
 				case DEFEATED:
 					gym.clearDetails();
 					handler.onDefeated(api, this);
+                    active = false;
 					break;
 				case VICTORY:
 					if (results != null) {
@@ -302,6 +310,7 @@ public class Battle {
 						gym.updateState(results.getGymState());
 						handler.onVictory(api, this, deltaPoints, gym.getPoints() + deltaPoints);
 					}
+                    active = false;
 					break;
 				default:
 					break;
@@ -392,7 +401,11 @@ public class Battle {
 		BattlePokemon attacker = getActivePokemon(action.getAttackerIndex());
 		if (action.getAttackerIndex() == 0) {
 			attacker = activeAttacker;
-		}
+            attacked = activeDefender;
+		}else {
+            attacker = activeDefender;
+            attacked = activeAttacker;
+        }
 
 		long damageWindowStart = action.getDamageWindowStart();
 		long damageWindowEnd = action.getDamageWindowEnd();
