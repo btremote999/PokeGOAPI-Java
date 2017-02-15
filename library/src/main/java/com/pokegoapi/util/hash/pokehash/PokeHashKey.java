@@ -54,11 +54,26 @@ public class PokeHashKey {
 	synchronized void setProperties(HttpURLConnection connection) {
 		this.checkPeriod();
 
-		this.ratePeriodEnd = connection.getHeaderFieldLong("X-RatePeriodEnd", this.ratePeriodEnd);
-		this.maxRequests = connection.getHeaderFieldInt("X-MaxRequestCount", this.maxRequests);
-		this.requestsRemaining = connection.getHeaderFieldInt("X-RateRequestsRemaining", this.requestsRemaining);
-		this.keyExpiration = connection.getHeaderFieldLong("X-AuthTokenExpiration", this.keyExpiration);
-		this.tested = true;
+
+        long newRatePeriodEnd = this.ratePeriodEnd;
+        try {
+            newRatePeriodEnd = Long.valueOf(connection.getHeaderField("X-RatePeriodEnd"));
+        }catch(Exception e){}finally {
+            this.ratePeriodEnd = newRatePeriodEnd;
+        }
+
+        this.maxRequests = connection.getHeaderFieldInt("X-MaxRequestCount", this.maxRequests);
+        this.requestsRemaining = connection.getHeaderFieldInt("X-RateRequestsRemaining", this.requestsRemaining);
+
+        long newKeyExpiration = this.keyExpiration;
+        try{
+            newKeyExpiration =Long.valueOf(connection.getHeaderField("X-AuthTokenExpiration"));
+        }catch(Exception e){
+            // some error
+        }finally {
+            this.keyExpiration = newKeyExpiration;
+        }
+        this.tested = true;
 	}
 
 	/**
