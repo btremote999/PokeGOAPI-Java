@@ -36,6 +36,7 @@ import com.pokegoapi.api.device.LocationFixes;
 import com.pokegoapi.api.device.SensorInfo;
 import com.pokegoapi.api.inventory.Inventories;
 import com.pokegoapi.api.listener.Listener;
+import com.pokegoapi.api.listener.LocationListener;
 import com.pokegoapi.api.listener.LoginListener;
 import com.pokegoapi.api.map.Map;
 import com.pokegoapi.api.map.Point;
@@ -400,6 +401,10 @@ public class PokemonGo {
 			throw new IllegalArgumentException("latittude can not exceed +/- 90");
 		}
 		latitude = value;
+
+		for (LocationListener listener : this.getListeners(LocationListener.class)) {
+			listener.onLocationUpdate(this, getPoint());
+		}
 	}
 
 	/**
@@ -413,6 +418,11 @@ public class PokemonGo {
 			throw new IllegalArgumentException("longitude can not exceed +/- 180");
 		}
 		longitude = value;
+
+
+		for (LocationListener listener : this.getListeners(LocationListener.class) ) {
+            listener.onLocationUpdate(this, getPoint());
+        }
 	}
 
 	/**
