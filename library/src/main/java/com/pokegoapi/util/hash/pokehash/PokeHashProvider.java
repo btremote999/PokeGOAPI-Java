@@ -42,8 +42,7 @@ import lombok.Setter;
  * This requires a key and is not free like the legacy provider.
  */
 public class PokeHashProvider implements HashProvider {
-    //	private static final String HASH_ENDPOINT = "https://pokehash.buddyauth.com/api/v121_2/hash";
-    private static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v125/hash";
+    private static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v127_2/hash";
 
     @Getter
     @Setter
