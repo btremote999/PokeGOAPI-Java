@@ -190,6 +190,7 @@ public class Battle {
 			Thread updateThread = new Thread(new Runnable() {
 				@Override
 				public void run() {
+                    active = true;
 					while (active) {
 						updateBattle(handler);
 						try {
