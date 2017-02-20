@@ -325,9 +325,37 @@ public class Battle {
 			}
 			battleState = state;
 		}
-		for (BattleAction action : log.getBattleActionsList()) {
-			serverActionQueue.add(new ServerAction(action));
-		}
+
+        // extra checking for activeAttacker and activeDefender status
+        if(active) {
+            if(activeAttacker.pokemon == null ||
+                    activeAttacker.pokemon.getPokemonId() ==
+                            POGOProtos.Enums.PokemonIdOuterClass.PokemonId.UNRECOGNIZED){
+                // defeated
+                gym.clearDetails();
+                handler.onDefeated(api, this);
+                active =false;
+
+            }
+
+            if(activeDefender.pokemon == null ||
+                    activeDefender.pokemon.getPokemonId() ==
+                            POGOProtos.Enums.PokemonIdOuterClass.PokemonId.UNRECOGNIZED) {
+                // no more defender but not official victory
+                if (results != null) {
+                    int deltaPoints = results.getGymPointsDelta();
+                    gym.updateState(results.getGymState());
+                    handler.onVictory(api, this, deltaPoints, gym.getPoints() + deltaPoints);
+                }
+
+                active = false;
+            }
+        }
+
+        if(active)
+            for (BattleAction action : log.getBattleActionsList()) {
+                serverActionQueue.add(new ServerAction(action));
+            }
 	}
 
 	/**
