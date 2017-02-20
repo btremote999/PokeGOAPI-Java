@@ -54,10 +54,6 @@ public class PokeHashKey {
 	synchronized void setProperties(HttpURLConnection connection) {
 		this.checkPeriod();
 
-
-        long newRatePeriodEnd = this.ratePeriodEnd;
-        try {
-            newRatePeriodEnd = Long.valueOf(connection.getHeaderField("X-RatePeriodEnd"));
 		this.ratePeriodEnd = this.getHeaderLong(connection, "X-RatePeriodEnd", this.ratePeriodEnd);
 		this.maxRequests = this.getHeaderInteger(connection, "X-MaxRequestCount", this.maxRequests);
 		this.requestsRemaining = this.getHeaderInteger(connection, "X-RateRequestsRemaining", this.requestsRemaining);

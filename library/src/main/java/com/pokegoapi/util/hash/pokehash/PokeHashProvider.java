@@ -53,6 +53,7 @@ public class PokeHashProvider implements HashProvider {
 
 	private static final Moshi MOSHI = new Builder().build();
 
+    private final  HashApiCounterListener listener;
 	@Getter
 	private final PokeHashKey key;
 	@Getter
@@ -246,12 +247,6 @@ public class PokeHashProvider implements HashProvider {
         return "";
     }
 
-    public interface HashApiCounterListener {
-        void hashFailed(long time_spend_ms, int err_no, String err_msg);
-
-        void hashSuccess(long time_spend_ms);
-    }
-
     @Override
     public int getHashVersion() {
         return VERSION;
@@ -267,6 +262,11 @@ public class PokeHashProvider implements HashProvider {
         return UNK25;
     }
 
+    public interface HashApiCounterListener {
+        void hashFailed(long time_spend_ms, int err_no, String err_msg);
+
+        void hashSuccess(long time_spend_ms);
+    }
 
     private static class Response {
         @Getter
