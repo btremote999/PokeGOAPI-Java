@@ -16,6 +16,7 @@
 package com.pokegoapi.util;
 
 import com.pokegoapi.exceptions.AsyncCaptchaActiveException;
+import com.pokegoapi.exceptions.AsyncHashException;
 import com.pokegoapi.exceptions.AsyncLoginFailedException;
 import com.pokegoapi.exceptions.AsyncPokemonGoException;
 import com.pokegoapi.exceptions.AsyncRemoteServerException;
@@ -24,8 +25,6 @@ import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.exceptions.hash.HashException;
 import rx.Observable;
-
-import java.util.concurrent.ExecutionException;
 
 public class AsyncHelper {
 	/**
@@ -44,40 +43,16 @@ public class AsyncHelper {
 		try {
 			return observable.toBlocking().first();
 		} catch (RuntimeException e) {
-			handleBlockingException(e);
+			if (e.getCause() instanceof AsyncLoginFailedException) {
+				throw new LoginFailedException(e.getMessage(), e.getCause());
+			} else if (e.getCause() instanceof AsyncRemoteServerException) {
+				throw new RemoteServerException(e.getMessage(), e.getCause());
+			} else if (e.getCause() instanceof AsyncCaptchaActiveException) {
+				throw new CaptchaActiveException((AsyncCaptchaActiveException) e.getCause());
+			} else if (e.getCause() instanceof AsyncHashException) {
+				throw new HashException(e.getMessage(), e.getCause());
+			}
+			throw new AsyncPokemonGoException("Unknown exception occurred. ", e);
 		}
-		return null;
-	}
-
-	/**
-	 * Handles toBlocking exception recursively
-	 *
-	 * @param throwable the exception
-	 * @throws LoginFailedException if a login exception is thrown
-	 * @throws RemoteServerException if a remove server exception is thrown
-	 * @throws CaptchaActiveException if a captcha exception is thrown
-	 * @throws HashException if an exception occurred while requesting hash
-	 */
-	private static void handleBlockingException(Throwable throwable)
-			throws LoginFailedException, RemoteServerException, CaptchaActiveException, HashException {
-		Throwable cause = throwable.getCause();
-		if (cause instanceof AsyncLoginFailedException) {
-			throw new LoginFailedException(throwable.getMessage(), cause);
-		} else if (cause instanceof AsyncRemoteServerException) {
-			throw new RemoteServerException(throwable.getMessage(), cause);
-		} else if (cause instanceof AsyncCaptchaActiveException) {
-			throw new CaptchaActiveException((AsyncCaptchaActiveException) cause);
-		} else if (cause instanceof LoginFailedException) {
-			throw (LoginFailedException) cause;
-		} else if (cause instanceof RemoteServerException) {
-			throw (RemoteServerException) cause;
-		} else if (cause instanceof CaptchaActiveException) {
-			throw (CaptchaActiveException) cause;
-		} else if (cause instanceof HashException) {
-			throw (HashException) cause;
-		} else if (cause instanceof ExecutionException) {
-			handleBlockingException(cause);
-		}
-		throw new AsyncPokemonGoException("Unknown exception occurred. ", throwable);
 	}
 }

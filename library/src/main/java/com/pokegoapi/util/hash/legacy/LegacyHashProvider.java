@@ -30,7 +30,8 @@ import java.util.List;
  */
 public class LegacyHashProvider implements HashProvider {
 	private static final int VERSION = 4500;
-	private static final long UNK25 = -1553869577012279119L;
+//	private static final long UNK25 = -1553869577012279119L;
+	private static final long UNK25 = -816976800928766045L;
 
     private static HashApiCounterListener listener;
 
