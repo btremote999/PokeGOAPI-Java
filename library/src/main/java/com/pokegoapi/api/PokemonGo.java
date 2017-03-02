@@ -47,9 +47,9 @@ import com.pokegoapi.exceptions.CaptchaActiveException;
 import com.pokegoapi.exceptions.LoginFailedException;
 import com.pokegoapi.exceptions.RemoteServerException;
 import com.pokegoapi.exceptions.hash.HashException;
+import com.pokegoapi.main.CommonRequests;
 import com.pokegoapi.main.Heartbeat;
 import com.pokegoapi.main.PokemonMeta;
-import com.pokegoapi.main.CommonRequests;
 import com.pokegoapi.main.RequestHandler;
 import com.pokegoapi.main.ServerRequest;
 import com.pokegoapi.main.ServerRequestEnvelope;
@@ -136,6 +136,23 @@ public class PokemonGo {
 	private HashProvider hashProvider;
 
 	private OkHttpClient client;
+
+	/**
+	 * Ptr8 is only sent with the first Get Map Object,
+	 * we need a flag to tell us if it has already been sent.
+	 * After that, GET_MAP_OBJECTS is sent with common requests.
+	 */
+	@Getter
+	@Setter
+	private boolean firstGMO = true;
+	/**
+	 * Ptr8 is only sent with the first Get Player request,
+	 * we need a flag to tell us if it has already been sent.
+	 * after that, GET_PLAYER  is sent with common requests.
+	 */
+	@Getter
+	@Setter
+	private boolean firstGP = true;
 
 	/**
 	 * Instantiates a new Pokemon go.
@@ -232,7 +249,8 @@ public class PokemonGo {
 
 		ServerRequest downloadConfigRequest = new ServerRequest(RequestType.DOWNLOAD_REMOTE_CONFIG_VERSION,
 				CommonRequests.getDownloadRemoteConfigVersionMessageRequest(this));
-		getRequestHandler().sendServerRequests(downloadConfigRequest, true, RequestType.GET_BUDDY_WALKED);
+		getRequestHandler().sendServerRequests(downloadConfigRequest, true, RequestType.GET_BUDDY_WALKED,
+				RequestType.GET_INCENSE_POKEMON);
 		getAssetDigest();
 
 		try {
@@ -315,7 +333,8 @@ public class PokemonGo {
 	 */
 	public void getAssetDigest() throws RemoteServerException, CaptchaActiveException, LoginFailedException,
 			HashException {
-		ServerRequestEnvelope envelope = ServerRequestEnvelope.createCommons(RequestType.GET_BUDDY_WALKED);
+		ServerRequestEnvelope envelope = ServerRequestEnvelope.createCommons(RequestType.GET_BUDDY_WALKED,
+				RequestType.GET_INCENSE_POKEMON);
 		envelope.add(RequestType.GET_ASSET_DIGEST, CommonRequests.getGetAssetDigestMessageRequest(this));
 		getRequestHandler().sendServerRequests(envelope);
 	}

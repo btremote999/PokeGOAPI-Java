@@ -42,13 +42,13 @@ import lombok.Setter;
  * This requires a key and is not free like the legacy provider.
  */
 public class PokeHashProvider implements HashProvider {
-	private static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v127_2/hash";
+	private static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v127_3/hash";
 
 	@Getter
 	@Setter
 	private String endpoint = DEFAULT_ENDPOINT;
 
-	private static final int VERSION = 5702;
+	private static final int VERSION = 5703;
 	private static final long UNK25 = -816976800928766045L;
 
 	private static final Moshi MOSHI = new Builder().build();
