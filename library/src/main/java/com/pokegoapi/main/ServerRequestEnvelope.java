@@ -15,7 +15,9 @@
 
 package com.pokegoapi.main;
 
+import POGOProtos.Networking.Platform.PlatformRequestTypeOuterClass.PlatformRequestType;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass.RequestType;
+import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import lombok.Getter;
 import lombok.Setter;
@@ -34,6 +36,8 @@ import java.util.concurrent.TimeoutException;
 public class ServerRequestEnvelope {
 	@Getter
 	private List<ServerRequest> requests = new ArrayList<>();
+	@Getter
+	private List<ServerPlatformRequest> platformRequests = new ArrayList<>();
 	@Getter
 	private Set<RequestType> commonExclusions = new HashSet<>();
 	@Setter
@@ -67,19 +71,9 @@ public class ServerRequestEnvelope {
 
 			@Override
 			public ServerResponse get() throws InterruptedException, ExecutionException {
-				return get(TimeUnit.MINUTES.toMillis(1));
-			}
-
-			@Override
-			public ServerResponse get(long timeout, TimeUnit unit)
-					throws InterruptedException, ExecutionException, TimeoutException {
-				return get(unit.toMillis(timeout));
-			}
-
-			private ServerResponse get(long timeout) throws ExecutionException, InterruptedException {
 				if (!isDone()) {
 					synchronized (responseLock) {
-						responseLock.wait(timeout);
+						responseLock.wait();
 					}
 				}
 				if (response != null && response.getException() != null) {
@@ -87,11 +81,18 @@ public class ServerRequestEnvelope {
 				}
 				return response;
 			}
+
+			@Override
+			public ServerResponse get(long timeout, TimeUnit unit)
+					throws InterruptedException, ExecutionException, TimeoutException {
+				return get();
+			}
 		});
 	}
 
 	/**
 	 * Creates a request envelope without commons
+	 *
 	 * @return the envelope created
 	 */
 	public static ServerRequestEnvelope create() {
@@ -100,6 +101,7 @@ public class ServerRequestEnvelope {
 
 	/**
 	 * Creates a request envelope with commons
+	 *
 	 * @param commonExclusions the common requests to exclude
 	 * @return the envelope created
 	 */
@@ -111,6 +113,7 @@ public class ServerRequestEnvelope {
 
 	/**
 	 * Excludes the given commons from this request
+	 *
 	 * @param requestTypes the requests to exclude
 	 */
 	public void excludeCommons(RequestType... requestTypes) {
@@ -119,6 +122,7 @@ public class ServerRequestEnvelope {
 
 	/**
 	 * Adds a request to this envelope
+	 *
 	 * @param request the request to add
 	 * @return the added request
 	 */
@@ -129,6 +133,7 @@ public class ServerRequestEnvelope {
 
 	/**
 	 * Adds a request to this envelope
+	 *
 	 * @param requestType the type of request being added
 	 * @param request the request to be added
 	 * @return the added request
@@ -138,11 +143,37 @@ public class ServerRequestEnvelope {
 	}
 
 	/**
+	 * Adds a platform request to this envelope
+	 *
+	 * @param request the request to add
+	 * @return the added request
+	 */
+	public ServerPlatformRequest add(ServerPlatformRequest request) {
+		this.platformRequests.add(request);
+		return request;
+	}
+
+	/**
+	 * Adds a platform request to this envelope
+	 *
+	 * @param requestType the type of request being added
+	 * @param request the request to be added
+	 * @return the added request
+	 */
+	public ServerPlatformRequest add(PlatformRequestType requestType, ByteString request) {
+		return this.add(new ServerPlatformRequest(requestType, request));
+	}
+
+	/**
 	 * Handles the response for this request
+	 *
 	 * @param response the response
 	 */
 	public void handleResponse(ServerResponse response) {
 		for (ServerRequest request : requests) {
+			request.handleResponse(response.get(request.getType()));
+		}
+		for (ServerPlatformRequest request : platformRequests) {
 			request.handleResponse(response.get(request.getType()));
 		}
 		synchronized (responseLock) {
@@ -153,6 +184,7 @@ public class ServerRequestEnvelope {
 
 	/**
 	 * Gets the observable for this envelope response
+	 *
 	 * @return the observable
 	 */
 	public Observable<ServerResponse> observable() {

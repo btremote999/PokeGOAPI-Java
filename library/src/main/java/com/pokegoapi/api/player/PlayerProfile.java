@@ -180,9 +180,7 @@ public class PlayerProfile {
 	 */
 	public void getProfile() throws RemoteServerException, CaptchaActiveException, LoginFailedException,
 			HashException {
-		GetPlayerProfileMessage profileMessage = GetPlayerProfileMessage.newBuilder()
-				.setPlayerName(playerData.getUsername())
-				.build();
+		GetPlayerProfileMessage profileMessage = GetPlayerProfileMessage.newBuilder().setPlayerName("").build();
 
 		ServerRequest profileRequest = new ServerRequest(RequestType.GET_PLAYER_PROFILE, profileMessage);
 		api.getRequestHandler().sendServerRequests(profileRequest, true);
@@ -226,7 +224,7 @@ public class PlayerProfile {
 				.setLevel(level)
 				.build();
 		ServerRequest serverRequest = new ServerRequest(RequestType.LEVEL_UP_REWARDS, msg);
-		api.getRequestHandler().sendServerRequests(serverRequest);
+		api.getRequestHandler().sendServerRequests(serverRequest, true);
 		LevelUpRewardsResponse response;
 		try {
 			response = LevelUpRewardsResponse.parseFrom(serverRequest.getData());
