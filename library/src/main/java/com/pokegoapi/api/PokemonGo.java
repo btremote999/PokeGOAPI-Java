@@ -241,6 +241,8 @@ public class PokemonGo {
 			getRequestHandler().exit();
 		}
 
+//		this.setFirstGMP(true);
+//		this.setFirstGP(true);
 		requestHandler = new RequestHandler(this, client);
 
 		getRequestHandler().sendServerRequests(ServerRequestEnvelope.create());

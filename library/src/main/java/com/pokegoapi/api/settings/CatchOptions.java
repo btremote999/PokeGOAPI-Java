@@ -30,161 +30,199 @@ import java.util.List;
 @ToString
 public class CatchOptions {
 
-	private final PokemonGo api;
-	private boolean useRazzBerry;
-	private int maxRazzBerries;
-	@Getter
-	private int maxPokeballs;
-	private double probability;
-	@Getter
-	private double normalizedHitPosition;
-	@Getter
-	private double normalizedReticleSize;
-	@Getter
-	private double spinModifier;
+    private final PokemonGo api;
+    @Getter
+    private boolean useRazzBerry;
+    private int maxRazzBerries;
+    @Getter
+    private int maxPokeballs;
+    private double probability;
+    @Getter
+    private double normalizedHitPosition;
+    @Getter
+    private double normalizedReticleSize;
+    @Getter
+    private double spinModifier;
 
-	@Getter
-	private PokeballSelector pokeballSelector = PokeballSelector.SMART;
+    @Getter
+    private PokeballSelector pokeballSelector = PokeballSelector.SMART;
 
-	/**
-	 * Instantiates a new CatchOptions object.
-	 *
-	 * @param api the api
-	 */
-	public CatchOptions(PokemonGo api) {
-		this.api = api;
-		this.useRazzBerry = false;
-		this.maxRazzBerries = 0;
-		this.maxPokeballs = 1;
-		this.probability = 0.50;
-		this.normalizedHitPosition = 1.0;
-		this.normalizedReticleSize = 1.95 + Math.random() * 0.05;
-		this.spinModifier = 0.85 + Math.random() * 0.15;
-	}
+    @Getter
+	private Pokeball selectedPokeBall;
+    @Getter
+    private boolean useNanabBerry;
+    @Getter
+    private boolean usePinapBerry;
 
-	/**
-	 * Sets this CatchOptions' pokeball selector
-	 *
-	 * @param selector the new selector
-	 * @return the CatchOptions object
-	 */
-	public CatchOptions withPokeballSelector(PokeballSelector selector) {
-		this.pokeballSelector = selector;
-		return this;
-	}
+    /**
+     * Instantiates a new CatchOptions object.
+     *
+     * @param api the api
+     */
+    public CatchOptions(PokemonGo api) {
+        this.api = api;
+        this.useRazzBerry = false;
+        this.useNanabBerry = false;
+        this.usePinapBerry = false;
+        this.maxRazzBerries = 0;
+        this.maxPokeballs = 1;
+        this.probability = 0.50;
+        this.normalizedHitPosition = 1.0;
+        this.normalizedReticleSize = 1.95 + Math.random() * 0.05;
+        this.spinModifier = 0.85 + Math.random() * 0.15;
+    }
 
-	/**
-	 * Allows using a single razzberry to attempt capture
-	 *
-	 * @param useRazzBerry true or false
-	 * @return the CatchOptions object
-	 */
-	public CatchOptions useRazzberry(boolean useRazzBerry) {
-		this.useRazzBerry = useRazzBerry;
-		return this;
-	}
+    /**
+     * Sets this CatchOptions' pokeball selector
+     *
+     * @param selector the new selector
+     * @return the CatchOptions object
+     */
+    public CatchOptions withPokeballSelector(PokeballSelector selector) {
+        this.pokeballSelector = selector;
+        return this;
+    }
 
-	/**
-	 * Set a maximum number of razzberries
-	 *
-	 * @param maxRazzBerries maximum allowed
-	 * @return the CatchOptions object
-	 */
-	public CatchOptions maxRazzberries(int maxRazzBerries) {
-		this.maxRazzBerries = maxRazzBerries;
-		return this;
-	}
+    /**
+     * Allows using a single razzberry to attempt capture
+     * Allows using a single Nanab Berry to attempt capture
+     *
+     * @param useNanabBerry true or false
+     * @return the CatchOptions object
+     */
+    public CatchOptions useNanabBerry(boolean useNanabBerry) {
+        this.useNanabBerry = useNanabBerry;
+        return this;
+    }
 
-	/**
-	 * Gets razzberries to catch a pokemon
-	 *
-	 * @return the number to use
-	 */
-	public int getRazzberries() {
-		return useRazzBerry && maxRazzBerries == 0 ? 1 : maxRazzBerries;
-	}
+    /**
+     * Allows using a single Pinap Berry to attempt capture
+     *
+     * @param usePinapBerry true or false
+     * @return the CatchOptions object
+     */
+    public CatchOptions usePinapBerry(boolean usePinapBerry) {
+        this.usePinapBerry = usePinapBerry;
+        return this;
+    }
 
-	/**
-	 * Set a maximum number of pokeballs
-	 *
-	 * @param maxPokeballs maximum allowed
-	 * @return the CatchOptions object
-	 */
-	public CatchOptions maxPokeballs(int maxPokeballs) {
-		if (maxPokeballs <= 1)
-			maxPokeballs = -1;
-		this.maxPokeballs = maxPokeballs;
-		return this;
-	}
+    /**
+     * Allows using a single Razz Berry to attempt capture
+     *
+     * @param useRazzBerry true or false
+     * @param useRazzBerry true or false
+     * @param useRazzBerry true or false
+     * @return the CatchOptions object
+     */
+    public CatchOptions useRazzberry(boolean useRazzBerry) {
+        this.useRazzBerry = useRazzBerry;
+        return this;
+    }
 
-	/**
-	 * Set a capture probability before switching balls
-	 * or the minimum probability for a specific ball
-	 *
-	 * @param probability the probability
-	 * @return the AsyncCatchOptions object
-	 */
-	public CatchOptions withProbability(double probability) {
-		this.probability = probability;
-		return this;
-	}
+    /**
+     * Set a maximum number of razzberries
+     *
+     * @param maxRazzBerries maximum allowed
+     * @return the CatchOptions object
+     */
+    public CatchOptions maxRazzberries(int maxRazzBerries) {
+        this.maxRazzBerries = maxRazzBerries;
+        return this;
+    }
 
-	/**
-	 * Set the normalized hit position of a pokeball throw
-	 *
-	 * @param normalizedHitPosition the normalized position
-	 * @return the CatchOptions object
-	 */
-	public CatchOptions setNormalizedHitPosition(double normalizedHitPosition) {
-		this.normalizedHitPosition = normalizedHitPosition;
-		return this;
-	}
+    /**
+     * Gets razzberries to catch a pokemon
+     *
+     * @return the number to use
+     */
+    public int getRazzberries() {
+        return useRazzBerry && maxRazzBerries == 0 ? 1 : maxRazzBerries;
+    }
 
-	/**
-	 * Set the normalized reticle for a pokeball throw
-	 *
-	 * @param normalizedReticleSize the normalized size
-	 * @return the CatchOptions object
-	 */
-	public CatchOptions setNormalizedReticleSize(double normalizedReticleSize) {
-		this.normalizedReticleSize = normalizedReticleSize;
-		return this;
-	}
+    /**
+     * Set a maximum number of pokeballs
+     *
+     * @param maxPokeballs maximum allowed
+     * @return the CatchOptions object
+     */
+    public CatchOptions maxPokeballs(int maxPokeballs) {
+        if (maxPokeballs <= 1) maxPokeballs = -1;
+        this.maxPokeballs = maxPokeballs;
+        return this;
+    }
 
-	/**
-	 * Set the spin modifier of a pokeball throw
-	 *
-	 * @param spinModifier the spin modifier
-	 * @return the CatchOptions object
-	 */
-	public CatchOptions setSpinModifier(double spinModifier) {
-		this.spinModifier = spinModifier;
-		return this;
-	}
+    /**
+     * Set a capture probability before switching balls
+     * or the minimum probability for a specific ball
+     *
+     * @param probability the probability
+     * @return the AsyncCatchOptions object
+     */
+    public CatchOptions withProbability(double probability) {
+        this.probability = probability;
+        return this;
+    }
 
-	/**
-	 * Selects a pokeball to use
-	 *
-	 * @param pokeballs the pokeballs contained in your inventory
-	 * @param captureProbability the probability of this capture
-	 * @return the pokeball to use
-	 * @throws NoSuchItemException if there are no pokeballs to use
-	 */
-	public Pokeball selectPokeball(List<Pokeball> pokeballs, double captureProbability) throws NoSuchItemException {
-		if (pokeballs.size() == 0) {
-			throw new NoSuchItemException("Player has no pokeballs");
-		}
-		if (pokeballSelector != null) {
-			Pokeball selected = pokeballSelector.select(pokeballs, captureProbability);
-			if (selected != null) {
-				boolean hasPokeball = pokeballs.contains(selected);
-				if (hasPokeball) {
-					return selected;
-				} else {
-					throw new NoSuchItemException("Player does not have pokeball: " + selected.name());
-				}
-			}
-		}
-		return pokeballs.get(0);
-	}
+    /**
+     * Set the normalized hit position of a pokeball throw
+     *
+     * @param normalizedHitPosition the normalized position
+     * @return the CatchOptions object
+     */
+    public CatchOptions setNormalizedHitPosition(double normalizedHitPosition) {
+        this.normalizedHitPosition = normalizedHitPosition;
+        return this;
+    }
+
+    /**
+     * Set the normalized reticle for a pokeball throw
+     *
+     * @param normalizedReticleSize the normalized size
+     * @return the CatchOptions object
+     */
+    public CatchOptions setNormalizedReticleSize(double normalizedReticleSize) {
+        this.normalizedReticleSize = normalizedReticleSize;
+        return this;
+    }
+
+    /**
+     * Set the spin modifier of a pokeball throw
+     *
+     * @param spinModifier the spin modifier
+     * @return the CatchOptions object
+     */
+    public CatchOptions setSpinModifier(double spinModifier) {
+        this.spinModifier = spinModifier;
+        return this;
+    }
+
+    /**
+     * Selects a pokeball to use
+     *
+     * @param pokeballs          the pokeballs contained in your inventory
+     * @param captureProbability the probability of this capture
+     * @return the pokeball to use
+     * @throws NoSuchItemException if there are no pokeballs to use
+     */
+    public Pokeball selectPokeball(List<Pokeball> pokeballs, double captureProbability) throws NoSuchItemException {
+        if (pokeballs.size() == 0) {
+            throw new NoSuchItemException("Player has no pokeballs");
+        }
+        if (pokeballSelector != null) {
+            Pokeball selected = pokeballSelector.select(pokeballs, captureProbability);
+            if (selected != null) {
+                boolean hasPokeball = pokeballs.contains(selected);
+                if (hasPokeball) {
+                    return selected;
+                } else {
+                    throw new NoSuchItemException("Player does not have pokeball: " + selected.name());
+                }
+            }
+        }
+        return pokeballs.get(0);
+    }
+
+    public void setSelectedPokeBall(Pokeball selectedPokeBall) {
+        this.selectedPokeBall = selectedPokeBall;
+    }
 }

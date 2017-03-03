@@ -39,9 +39,9 @@ public class ExampleConstants {
 	public static HashProvider getHashProvider() {
 		boolean hasKey = POKEHASH_KEY != null && POKEHASH_KEY.length() > 0;
 		if (hasKey) {
-			return new PokeHashProvider(PokeHashKey.from(POKEHASH_KEY), true);
+			return new PokeHashProvider(PokeHashKey.from(POKEHASH_KEY), "", true,null);
 		} else {
-			return new LegacyHashProvider();
+			return new LegacyHashProvider(null);
 		}
 	}
 }
