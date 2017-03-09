@@ -130,7 +130,7 @@ public class GoogleAutoCredentialProvider extends CredentialProvider {
 			LoginFailedException {
 		AuthInfo.Builder builder = AuthInfo.newBuilder();
 		builder.setProvider("google");
-		builder.setToken(AuthInfo.JWT.newBuilder().setContents(getTokenId(refresh)).setUnknown2(59).build());
+		builder.setToken(AuthInfo.JWT.newBuilder().setContents(getTokenId(refresh)).setUnknown2(0).build());
 		return builder.build();
 	}
 
