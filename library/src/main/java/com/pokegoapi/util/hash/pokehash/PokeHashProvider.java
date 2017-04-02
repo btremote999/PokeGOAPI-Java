@@ -15,12 +15,10 @@
 
 package com.pokegoapi.util.hash.pokehash;
 
-import com.pokegoapi.exceptions.hash.HashException;
-import com.pokegoapi.exceptions.hash.HashLimitExceededException;
+import com.pokegoapi.exceptions.request.HashException;
+import com.pokegoapi.exceptions.request.HashLimitExceededException;
 import com.pokegoapi.util.hash.Hash;
 import com.pokegoapi.util.hash.HashProvider;
-import com.pokegoapi.util.hash.crypto.Crypto;
-import com.pokegoapi.util.hash.crypto.PokeHashCrypto;
 import com.squareup.moshi.Moshi;
 import com.squareup.moshi.Moshi.Builder;
 
@@ -40,16 +38,17 @@ import lombok.Setter;
 /**
  * Hash provider on latest version, using the PokeHash hashing service.
  * This requires a key and is not free like the legacy provider.
+ * @see <a href="https://hashing.pogodev.org/">https://hashing.pogodev.org/</a>
  */
 public class PokeHashProvider implements HashProvider {
-	private static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v127_4/hash";
+	private static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v129_1/hash";
 
 	@Getter
 	@Setter
 	private String endpoint = DEFAULT_ENDPOINT;
 
-	private static final int VERSION = 5704;
-	private static final long UNK25 = -816976800928766045L;
+	private static final int VERSION = 5901;
+	private static final long UNK25 = -3226782243204485589L;
 
 	private static final Moshi MOSHI = new Builder().build();
 
@@ -185,14 +184,22 @@ public class PokeHashProvider implements HashProvider {
                     }
                     throw new HashException("Unauthorized hash request!");
                 case 429:
-                    if (error.length() > 0) {
+					if (awaitRequests) {
+						try {
+							key.await();
+							return provide(timestamp, latitude, longitude, altitude, authTicket, sessionData, requests);
+						} catch (InterruptedException e) {
+							throw new HashException(e);
+						}
+					} else {
+						if (error.length() > 0) {
                         if (this.listener != null) {
                             this.listener.hashFailed(System.currentTimeMillis() - timestamp,
                                                      HttpURLConnection.HTTP_UNAUTHORIZED,
                                                      error);
                         }
-                        throw new HashLimitExceededException(error);
-                    }
+							throw new HashLimitExceededException(error);
+						}
 
                     if (this.listener != null) {
                         this.listener.hashFailed(System.currentTimeMillis() - timestamp,
@@ -200,7 +207,8 @@ public class PokeHashProvider implements HashProvider {
                                                  "Exceeded hash limit!");
                     }
 
-                    throw new HashLimitExceededException("Exceeded hash limit!");
+						throw new HashLimitExceededException("Exceeded hash limit!");
+					}
                 case 404:
                     throw new HashException("Unknown hashing endpoint! \"" + this.endpoint + "\"");
                 default:
@@ -233,78 +241,67 @@ public class PokeHashProvider implements HashProvider {
         }
     }
 
-    private String getError(HttpURLConnection connection) throws IOException {
-        if (connection.getErrorStream() != null) {
-            BufferedReader error = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
-            StringBuilder builder = new StringBuilder();
-            String line;
-            while ((line = error.readLine()) != null) {
-                builder.append(line);
-            }
-            error.close();
-            return builder.toString();
-        }
-        return "";
-    }
+	private String getError(HttpURLConnection connection) throws IOException {
+		if (connection.getErrorStream() != null) {
+			BufferedReader error = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
+			StringBuilder builder = new StringBuilder();
+			String line;
+			while ((line = error.readLine()) != null) {
+				builder.append(line);
+			}
+			error.close();
+			return builder.toString();
+		}
+		return "";
+	}
 
-    @Override
-    public int getHashVersion() {
-        return VERSION;
-    }
+	@Override
+	public int getHashVersion() {
+		return VERSION;
+	}
 
-    @Override
-    public Crypto getCrypto() {
-        return PokeHashCrypto.POKE_HASH;
-    }
+	@Override
+	public long getUNK25() {
+		return UNK25;
+	}
 
-    @Override
-    public long getUNK25() {
-        return UNK25;
-    }
+	private static class Response {
+		@Getter
+		private long locationAuthHash;
+		@Getter
+		private long locationHash;
+		@Getter
+		private List<Long> requestHashes;
+	}
 
-    public interface HashApiCounterListener {
-        void hashFailed(long time_spend_ms, int err_no, String err_msg);
+	private static class Request {
+		@Getter
+		private long latitude64;
+		@Getter
+		private long longitude64;
+		@Getter
+		private long accuracy64;
+		@Getter
+		private long timestamp;
+		@Getter
+		private String authTicket;
+		@Getter
+		private String sessionData;
+		@Getter
+		private String[] requests;
 
-        void hashSuccess(long time_spend_ms);
-    }
-
-    private static class Response {
-        @Getter
-        private long locationAuthHash;
-        @Getter
-        private long locationHash;
-        @Getter
-        private List<Long> requestHashes;
-    }
-
-    private static class Request {
-        @Getter
-        private double latitude;
-        @Getter
-        private double longitude;
-        @Getter
-        private double altitude;
-        @Getter
-        private long timestamp;
-        @Getter
-        private String authTicket;
-        @Getter
-        private String sessionData;
-        @Getter
-        private String[] requests;
-
-        private Request(double latitude, double longitude, double altitude, long timestamp, byte[] authTicket,
-                        byte[] sessionData, byte[][] requests) {
-            this.latitude = latitude;
-            this.longitude = longitude;
-            this.altitude = altitude;
-            this.timestamp = timestamp;
-            this.authTicket = Base64.encodeBytes(authTicket);
-            this.sessionData = Base64.encodeBytes(sessionData);
-            this.requests = new String[requests.length];
-            for (int i = 0; i < requests.length; i++) {
-                this.requests[i] = Base64.encodeBytes(requests[i]);
-            }
-        }
-    }
+		private Request(double latitude, double longitude, double altitude, long timestamp, byte[] authTicket,
+				byte[] sessionData, byte[][] requests) {
+			this.latitude64 = Double.doubleToLongBits(latitude);
+			this.longitude64 = Double.doubleToLongBits(longitude);
+			this.accuracy64 = Double.doubleToLongBits(altitude);
+			this.timestamp = timestamp;
+			this.authTicket = Base64.encodeBytes(authTicket);
+			this.sessionData = Base64.encodeBytes(sessionData);
+			this.requests = new String[requests.length];
+			for (int i = 0; i < requests.length; i++) {
+				this.requests[i] = Base64.encodeBytes(requests[i]);
+			}
+		}
+	}
 }

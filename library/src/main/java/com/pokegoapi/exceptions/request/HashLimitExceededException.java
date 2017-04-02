@@ -13,24 +13,23 @@
  *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.pokegoapi.exceptions;
-
-import lombok.Getter;
+package com.pokegoapi.exceptions.request;
 
 /**
- * Exception thrown when a message is requested to send, but a captcha is currently active
+ * Hash Limit Exceeded Exception
  */
-public class AsyncCaptchaActiveException extends AsyncPokemonGoException {
-	@Getter
-	private String captcha;
+public class HashLimitExceededException extends HashException {
 
-	public AsyncCaptchaActiveException(String captcha) {
-		super("Captcha must be solved before sending messages!");
-		this.captcha = captcha;
+	public HashLimitExceededException() {
+		super();
 	}
 
-	public AsyncCaptchaActiveException(Exception exception, String captcha) {
-		super("Captcha must be solved before sending messages!", exception);
-		this.captcha = captcha;
+	public HashLimitExceededException(String reason) {
+		super(reason);
 	}
+
+	public HashLimitExceededException(Throwable exception) {
+		super(exception);
+	}
+
 }
