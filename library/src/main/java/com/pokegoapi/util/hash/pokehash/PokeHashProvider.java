@@ -304,4 +304,11 @@ public class PokeHashProvider implements HashProvider {
 			}
 		}
 	}
+
+	public interface HashApiCounterListener {
+		void hashFailed(long time_spend_ms, int err_no, String err_msg);
+
+		void hashSuccess(long time_spend_ms);
+	}
+
 }
