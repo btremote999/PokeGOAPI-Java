@@ -5,7 +5,8 @@
 
 package com.pokegoapi.util.hash.crypto;
 
-import java.security.InvalidKeyException;
+// Fuck !! Android cannot have conflict with it
+//import java.security.InvalidKeyException;
 
 /**
  * Twofish is an AES candidate algorithm. It is a balanced 128-bit Feistel
@@ -273,14 +274,14 @@ public final class TwoFish {
 	 *
 	 * @param k The 64/128/192/256-bit user-key to use.
 	 * @return This cipher's round keys.
-	 * @throws InvalidKeyException If the key is invalid.
+//	 * @throws InvalidKeyException If the key is invalid.
 	 */
-	public static synchronized Object makeKey(byte[] k) throws InvalidKeyException {
+	public static synchronized Object makeKey(byte[] k) throws Exception {
 		if (k == null)
-			throw new InvalidKeyException("Empty key");
+			throw new Exception("Empty key");
 		int length = k.length;
 		if (!(length == 8 || length == 16 || length == 24 || length == 32))
-			throw new InvalidKeyException("Incorrect key length");
+			throw new Exception("Incorrect key length");
 
 		int k64Cnt = length / 8;
 		int subkeyCnt = ROUND_SUBKEYS + 2 * ROUNDS;

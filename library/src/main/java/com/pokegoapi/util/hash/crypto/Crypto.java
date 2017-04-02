@@ -14,8 +14,8 @@
  */
 
 package com.pokegoapi.util.hash.crypto;
-
-import java.security.InvalidKeyException;
+// Fuck !! Android cannot have conflict with it
+//import java.security.InvalidKeyException;
 
 public class Crypto {
 	private static final byte[] KEY = new byte[]{
@@ -87,7 +87,7 @@ public class Crypto {
 
 			output[outputSize - 1] = this.makeIntegrityByte(rand);
 			return output;
-		} catch (InvalidKeyException e) {
+		} catch (Exception e) {
 			return null;
 		}
 	}
