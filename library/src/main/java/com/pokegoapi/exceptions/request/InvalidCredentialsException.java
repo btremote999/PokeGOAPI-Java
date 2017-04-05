@@ -13,13 +13,22 @@
  *     along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.pokegoapi.util.hash.crypto;
+package com.pokegoapi.exceptions.request;
 
-public class PokeHashCrypto extends Crypto {
-	public static final Crypto POKE_HASH = new PokeHashCrypto();
+public class InvalidCredentialsException extends RequestFailedException {
+	public InvalidCredentialsException() {
+		super();
+	}
 
-	@Override
-	protected byte makeIntegrityByte(Rand rand) {
-		return (byte) (rand.next() & 0xE3 | 0x10);
+	public InvalidCredentialsException(String reason) {
+		super(reason);
+	}
+
+	public InvalidCredentialsException(Throwable exception) {
+		super(exception);
+	}
+
+	public InvalidCredentialsException(String reason, Throwable exception) {
+		super(reason, exception);
 	}
 }

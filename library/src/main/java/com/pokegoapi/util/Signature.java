@@ -25,7 +25,7 @@ import com.google.protobuf.ByteString;
 import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.api.device.LocationFixes;
 import com.pokegoapi.api.device.SensorInfo;
-import com.pokegoapi.exceptions.hash.HashException;
+import com.pokegoapi.exceptions.request.RequestFailedException;
 import com.pokegoapi.util.hash.Hash;
 import com.pokegoapi.util.hash.HashProvider;
 import com.pokegoapi.util.hash.crypto.Crypto;
@@ -41,9 +41,9 @@ public class Signature {
 	 *
 	 * @param api the api
 	 * @param builder the RequestEnvelope builder
-	 * @throws HashException if an invalid request is sent
+	 * @throws RequestFailedException if an invalid request is sent
 	 */
-	public static void setSignature(PokemonGo api, RequestEnvelope.Builder builder) throws HashException {
+	public static void setSignature(PokemonGo api, RequestEnvelope.Builder builder) throws RequestFailedException {
 		boolean usePtr8 = false;
 		byte[][] requestData = new byte[builder.getRequestsCount()][];
 		for (int i = 0; i < builder.getRequestsCount(); i++) {
@@ -104,10 +104,10 @@ public class Signature {
 		for (int i = 0; i < builder.getRequestsCount(); i++)
 			signatureBuilder.addRequestHash(requestHashes.get(i));
 
-		Crypto crypto = provider.getCrypto();
+		Crypto crypto = new Crypto();
 		SignatureOuterClass.Signature signature = signatureBuilder.build();
 		byte[] signatureByteArray = signature.toByteArray();
-		byte[] encrypted = crypto.encrypt(signatureByteArray, timeSinceStart).toByteBuffer().array();
+		byte[] encrypted = crypto.encrypt(signatureByteArray, timeSinceStart);
 
 		ByteString signatureBytes = SendEncryptedSignatureRequest.newBuilder()
 				.setEncryptedSignature(ByteString.copyFrom(encrypted)).build()
