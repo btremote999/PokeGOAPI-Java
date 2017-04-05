@@ -31,10 +31,7 @@ import com.annimon.stream.function.Predicate;
 import com.google.protobuf.InvalidProtocolBufferException;
 import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.api.pokemon.Pokemon;
-import com.pokegoapi.exceptions.CaptchaActiveException;
-import com.pokegoapi.exceptions.LoginFailedException;
-import com.pokegoapi.exceptions.RemoteServerException;
-import com.pokegoapi.exceptions.hash.HashException;
+import com.pokegoapi.exceptions.request.RequestFailedException;
 import com.pokegoapi.main.ServerRequest;
 import com.pokegoapi.main.ServerRequestEnvelope;
 import com.pokegoapi.main.ServerResponse;
@@ -104,11 +101,11 @@ public class PokeBank {
 	}
 
 	/**
-	 * Remove pokemon.
+	 * Remove pokemon by ID.
 	 *
-	 * @param pokemon the pokemon to remove.
+	 * @param pokemonID the pokemon id to remove.
 	 */
-	public void removePokemon(final Pokemon pokemon) {
+	public void removePokemon(final long pokemonID) {
 		synchronized (this.lock) {
 			List<Pokemon> previous = new ArrayList<>();
 			previous.addAll(pokemons);
@@ -116,11 +113,20 @@ public class PokeBank {
 			pokemons.clear();
 			pokemons.addAll(Stream.of(previous).filter(new Predicate<Pokemon>() {
 				@Override
-				public boolean test(Pokemon pokemn) {
-					return pokemn.getId() != pokemon.getId();
+				public boolean test(Pokemon pokemon) {
+					return pokemon.getId() != pokemonID;
 				}
 			}).collect(Collectors.<Pokemon>toList()));
 		}
+	}
+
+	/**
+	 * Remove pokemon.
+	 *
+	 * @param pokemon the pokemon to remove.
+	 */
+	public void removePokemon(final Pokemon pokemon) {
+		removePokemon(pokemon.getId());
 	}
 
 	/**
@@ -145,13 +151,9 @@ public class PokeBank {
 	 *
 	 * @param releasePokemon the pokemon to release
 	 * @return the amount of candies for each pokemon family
-	 * @throws CaptchaActiveException if a captcha is active and a message cannot be sent
-	 * @throws LoginFailedException the login fails
-	 * @throws RemoteServerException if the server errors
-	 * @throws HashException if an exception occurred while requesting hash
+	 * @throws RequestFailedException if an exception occurred while sending requests
 	 */
-	public Map<PokemonFamilyId, Integer> releasePokemon(Pokemon... releasePokemon)
-			throws CaptchaActiveException, LoginFailedException, RemoteServerException, HashException {
+	public Map<PokemonFamilyId, Integer> releasePokemon(Pokemon... releasePokemon) throws RequestFailedException {
 		ReleasePokemonMessage.Builder releaseBuilder = ReleasePokemonMessage.newBuilder();
 		for (Pokemon pokemon : releasePokemon) {
 			if (!pokemon.isDeployed() && !pokemon.isFavorite()) {
@@ -192,7 +194,7 @@ public class PokeBank {
 			}
 			return candyCount;
 		} catch (InvalidProtocolBufferException e) {
-			throw new RemoteServerException(e);
+			throw new RequestFailedException(e);
 		}
 	}
 

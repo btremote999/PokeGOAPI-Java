@@ -18,7 +18,6 @@ package com.pokegoapi.util.hash.legacy;
 import com.pokegoapi.util.NiaHash;
 import com.pokegoapi.util.hash.Hash;
 import com.pokegoapi.util.hash.HashProvider;
-import com.pokegoapi.util.hash.crypto.Crypto;
 import com.pokegoapi.util.hash.pokehash.PokeHashProvider.HashApiCounterListener;
 
 import java.nio.ByteBuffer;
@@ -27,11 +26,14 @@ import java.util.List;
 
 /**
  * 0.45.0 local hash provider, no key required
+ * @deprecated Niantic have disabled use of invalid hashes,
+ * {@link com.pokegoapi.util.hash.pokehash.PokeHashProvider} must be used now
  */
+@Deprecated
 public class LegacyHashProvider implements HashProvider {
 	private static final int VERSION = 4500;
-//	private static final long UNK25 = -1553869577012279119L;
 	private static final long UNK25 = -816976800928766045L;
+	
 
     private static HashApiCounterListener listener;
 
@@ -59,11 +61,6 @@ public class LegacyHashProvider implements HashProvider {
 	@Override
 	public int getHashVersion() {
 		return VERSION;
-	}
-
-	@Override
-	public Crypto getCrypto() {
-		return Crypto.LEGACY;
 	}
 
 	@Override
