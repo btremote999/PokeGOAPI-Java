@@ -101,7 +101,10 @@ public class Item {
 	 * @return true if the item is incense
 	 */
 	public boolean isIncense() {
-		return settings.hasIncense();
+		if(settings != null)
+			return settings.hasIncense();
+		else
+			return false;
 	}
 
 	/**

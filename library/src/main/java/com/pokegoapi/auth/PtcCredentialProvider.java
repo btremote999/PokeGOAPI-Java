@@ -18,6 +18,7 @@ package com.pokegoapi.auth;
 import POGOProtos.Networking.Envelopes.RequestEnvelopeOuterClass.RequestEnvelope.AuthInfo;
 import com.pokegoapi.exceptions.request.InvalidCredentialsException;
 import com.pokegoapi.exceptions.request.LoginFailedException;
+import com.pokegoapi.exceptions.request.RequestFailedException;
 import com.pokegoapi.util.SystemTimeImpl;
 import com.pokegoapi.util.Time;
 import com.squareup.moshi.Moshi;
@@ -306,12 +307,17 @@ public class PtcCredentialProvider extends CredentialProvider {
 	 */
 	@Override
 	public AuthInfo getAuthInfo(boolean refresh) throws LoginFailedException, InvalidCredentialsException {
-		if (refresh || isTokenIdExpired()) {
-			login(username, password, 0);
-		}
 
-		authbuilder.setProvider("ptc");
-		authbuilder.setToken(AuthInfo.JWT.newBuilder().setContents(tokenId).setUnknown2(unknown2).build());
+			if (refresh || isTokenIdExpired()) {
+				login(username, password, 0);
+			}
+
+			authbuilder.setProvider("ptc");
+		try {
+			authbuilder.setToken(AuthInfo.JWT.newBuilder().setContents(tokenId).setUnknown2(unknown2).build());
+		}catch(NullPointerException e){
+			throw new LoginFailedException("NPE");
+		}
 
 		return authbuilder.build();
 	}
