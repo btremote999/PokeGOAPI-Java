@@ -40,9 +40,9 @@ public class LegacyHashProvider implements HashProvider {
 			byte[] sessionData, byte[][] requests) throws HashException {
 		throw new HashException(this.getClass().getName() + " is no longer supported");
 
-        if(listener != null) {
-            listener.hashSuccess(System.currentTimeMillis() - timestamp);
-        }
+//        if(listener != null) {
+//            listener.hashSuccess(System.currentTimeMillis() - timestamp);
+//        }
 
 	}
 
