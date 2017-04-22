@@ -3,28 +3,28 @@ package com.pokegoapi.util.hash.pokehash;
 import lombok.Getter;
 
 import java.net.HttpURLConnection;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.WeakHashMap;
 
 public class PokeHashKey {
-	public static final Map<String, PokeHashKey> KEYS = new HashMap<>();
+	private static final Map<String, PokeHashKey> KEYS = new WeakHashMap<>();
 
 	@Getter
-	public final String key;
+	private final String key;
 
-	public int rpm;
+	private int rpm;
 	@Getter
-	public int maxRequests = 150;
+	private int maxRequests = 150;
 	@Getter
-	public int requestsRemaining = this.maxRequests;
+	private int requestsRemaining = this.maxRequests;
 	@Getter
-	public long keyExpiration;
+	private long keyExpiration;
 	@Getter
-	public long ratePeriodEnd;
+	private long ratePeriodEnd;
 
-	public boolean tested;
+	private boolean tested;
 
-	public PokeHashKey(String key) {
+	private PokeHashKey(String key) {
 		this.key = key;
 	}
 
@@ -51,7 +51,7 @@ public class PokeHashKey {
 	 *
 	 * @param connection the connection to check headers on
 	 */
-	public synchronized void setProperties(HttpURLConnection connection) {
+	synchronized void setProperties(HttpURLConnection connection) {
 		this.checkPeriod();
 
 		this.ratePeriodEnd = this.getHeaderLong(connection, "X-RatePeriodEnd", this.ratePeriodEnd);
@@ -68,7 +68,7 @@ public class PokeHashKey {
 	 * @param defaultValue the default value to use, if parsing fails
 	 * @return the parsed long
 	 */
-	public long getHeaderLong(HttpURLConnection connection, String name, long defaultValue) {
+	private long getHeaderLong(HttpURLConnection connection, String name, long defaultValue) {
 		try {
 			return Long.parseLong(connection.getHeaderField(name));
 		} catch (Exception e) {
@@ -83,7 +83,7 @@ public class PokeHashKey {
 	 * @param defaultValue the default value to use, if parsing fails
 	 * @return the parsed integer
 	 */
-	public int getHeaderInteger(HttpURLConnection connection, String name, int defaultValue) {
+	private int getHeaderInteger(HttpURLConnection connection, String name, int defaultValue) {
 		try {
 			return Integer.parseInt(connection.getHeaderField(name));
 		} catch (Exception e) {
@@ -96,7 +96,7 @@ public class PokeHashKey {
 	 *
 	 * @throws InterruptedException if the thread is interrupted while awaiting the current period to end
 	 */
-	public void await() throws InterruptedException {
+	void await() throws InterruptedException {
 		if (this.requestsRemaining <= 0) {
 			long timeToPeriodEnd = System.currentTimeMillis() - this.getRatePeriodEnd();
 			if (this.tested && timeToPeriodEnd > 0) {
@@ -109,7 +109,7 @@ public class PokeHashKey {
 	/**
 	 * Checks if this period is over yet, and if it is, set RPM
 	 */
-	public synchronized void checkPeriod() {
+	private synchronized void checkPeriod() {
 		if (System.currentTimeMillis() > this.ratePeriodEnd) {
 			this.rpm = this.maxRequests - this.requestsRemaining;
 			this.requestsRemaining = this.maxRequests;
