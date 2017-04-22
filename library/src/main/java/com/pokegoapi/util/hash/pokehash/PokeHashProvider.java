@@ -41,22 +41,22 @@ import lombok.Setter;
  * @see <a href="https://hashing.pogodev.org/">https://hashing.pogodev.org/</a>
  */
 public class PokeHashProvider implements HashProvider {
-	private static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v131_0/hash";
+	protected static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v131_0/hash";
 
 	@Getter
 	@Setter
-	private String endpoint = DEFAULT_ENDPOINT;
+	protected String endpoint = DEFAULT_ENDPOINT;
 
-	private static final int VERSION = 6100;
-	private static final long UNK25 = 1296456256998993698L;
+	protected static final int VERSION = 6100;
+	protected static final long UNK25 = 1296456256998993698L;
 
-	private static final Moshi MOSHI = new Builder().build();
+	protected static final Moshi MOSHI = new Builder().build();
 
-    private final  HashApiCounterListener listener;
+    protected final  HashApiCounterListener listener;
 	@Getter
-	private final PokeHashKey key;
+	protected final PokeHashKey key;
 	@Getter
-	private final boolean awaitRequests;
+	protected final boolean awaitRequests;
 
     /**
      * Creates a PokeHashProvider with the given key
@@ -241,7 +241,7 @@ public class PokeHashProvider implements HashProvider {
         }
     }
 
-	private String getError(HttpURLConnection connection) throws IOException {
+	protected String getError(HttpURLConnection connection) throws IOException {
 		if (connection.getErrorStream() != null) {
 			BufferedReader error = new BufferedReader(new InputStreamReader(connection.getErrorStream()));
 			StringBuilder builder = new StringBuilder();
@@ -265,16 +265,16 @@ public class PokeHashProvider implements HashProvider {
 		return UNK25;
 	}
 
-	private static class Response {
+	public static class Response {
 		@Getter
 		private long locationAuthHash;
 		@Getter
 		private long locationHash;
 		@Getter
-		private List<Long> requestHashes;
+		protected List<Long> requestHashes;
 	}
 
-	private static class Request {
+	public static class Request {
 		@Getter
 		private long latitude64;
 		@Getter
@@ -290,7 +290,7 @@ public class PokeHashProvider implements HashProvider {
 		@Getter
 		private String[] requests;
 
-		private Request(double latitude, double longitude, double altitude, long timestamp, byte[] authTicket,
+		public Request(double latitude, double longitude, double altitude, long timestamp, byte[] authTicket,
 				byte[] sessionData, byte[][] requests) {
 			this.latitude64 = Double.doubleToLongBits(latitude);
 			this.longitude64 = Double.doubleToLongBits(longitude);

@@ -51,7 +51,7 @@ public class PokeHashKey {
 	 *
 	 * @param connection the connection to check headers on
 	 */
-	synchronized void setProperties(HttpURLConnection connection) {
+	public synchronized void setProperties(HttpURLConnection connection) {
 		this.checkPeriod();
 
 		this.ratePeriodEnd = this.getHeaderLong(connection, "X-RatePeriodEnd", this.ratePeriodEnd);
@@ -96,7 +96,7 @@ public class PokeHashKey {
 	 *
 	 * @throws InterruptedException if the thread is interrupted while awaiting the current period to end
 	 */
-	void await() throws InterruptedException {
+	public void await() throws InterruptedException {
 		if (this.requestsRemaining <= 0) {
 			long timeToPeriodEnd = System.currentTimeMillis() - this.getRatePeriodEnd();
 			if (this.tested && timeToPeriodEnd > 0) {
