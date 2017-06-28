@@ -18,19 +18,11 @@ package com.pokegoapi.auth;
 import POGOProtos.Networking.Envelopes.RequestEnvelopeOuterClass.RequestEnvelope.AuthInfo;
 import com.pokegoapi.exceptions.request.InvalidCredentialsException;
 import com.pokegoapi.exceptions.request.LoginFailedException;
-import com.pokegoapi.exceptions.request.RequestFailedException;
 import com.pokegoapi.util.SystemTimeImpl;
 import com.pokegoapi.util.Time;
 import com.squareup.moshi.Moshi;
 import lombok.Setter;
-import okhttp3.Cookie;
-import okhttp3.CookieJar;
-import okhttp3.HttpUrl;
-import okhttp3.Interceptor;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
-import okhttp3.Response;
+import okhttp3.*;
 
 import java.io.IOException;
 import java.net.URLEncoder;
@@ -40,18 +32,20 @@ import java.util.HashMap;
 import java.util.List;
 
 public class PtcCredentialProvider extends CredentialProvider {
-	public static final String CLIENT_SECRET = "w8ScCUXJQc6kXKw8FiOhd8Fixzht18Dq3PEVkUCP5ZPxtgyWsbTvWHFLm2wNY0JR";
-	public static final String REDIRECT_URI = "https://www.nianticlabs.com/pokemongo/error";
-	public static final String CLIENT_ID = "mobile-app_pokemon-go";
-	public static final String SERVICE_URL = "https://sso.pokemon.com/sso/oauth2.0/callbackAuthorize";
-	public static final String LOGIN_URL = "https://sso.pokemon.com/sso/login?locale=en&service="
-			+ URLEncoder.encode(SERVICE_URL) + "";
-	public static final String LOGIN_OAUTH = "https://sso.pokemon.com/sso/oauth2.0/accessToken";
-	public static final String USER_AGENT = "pokemongo/1 CFNetwork/808.2.16 Darwin/16.3.0";
-	//We try and refresh token 5 minutes before it actually expires
-	protected static final long REFRESH_TOKEN_BUFFER_TIME = 5 * 60 * 1000;
-	protected static final int MAXIMUM_RETRIES = 5;
-	protected static final int[] UK2_VALUES = new int[]{2, 8, 21, 24, 28, 37, 56, 58, 59};
+	private static final String USER_AGENT = "pokemongo/1 CFNetwork/811.4.18 Darwin/16.5.0";
+	private static final String UNITY_VERSION = "5.5.1f1";
+
+	private static final String LOGIN_URL = "https://sso.pokemon.com/sso/login";
+	private static final String SERVICE_URL = "https://sso.pokemon.com/sso/oauth2.0/callbackAuthorize";
+	private static final String LOGIN_OAUTH_URL = "https://sso.pokemon.com/sso/oauth2.0/authorize";
+
+	private static final String REDIRECT_URI = "https://www.nianticlabs.com/pokemongo/error";
+
+	private static final String CLIENT_ID = "mobile-app_pokemon-go";
+	private static final String HOST = "sso.pokemon.com";
+	private static final String EVENT_ID = "submit";
+	private static final String LOCALE = "en_US";
+	private static final int MAXIMUM_RETRIES = 5;
 
 	protected final OkHttpClient client;
 	protected final String username;
@@ -61,8 +55,6 @@ public class PtcCredentialProvider extends CredentialProvider {
 	protected long expiresTimestamp;
 
 	protected AuthInfo.Builder authbuilder;
-
-	private int unknown2;
 
 	protected SecureRandom random = new SecureRandom();
 
@@ -111,7 +103,14 @@ public class PtcCredentialProvider extends CredentialProvider {
 					public Response intercept(Chain chain) throws IOException {
 						//Makes sure the User-Agent is always set
 						Request req = chain.request();
-						req = req.newBuilder().header("User-Agent", USER_AGENT).build();
+						req = req.newBuilder()
+								.removeHeader("User-Agent")
+								.header("User-Agent", USER_AGENT)
+								.header("X-Unity-Version", UNITY_VERSION)
+								.header("Host", HOST)
+								.header("Connection", "keep-alive")
+								.header("Accept-Language", LOCALE.replace("_", "-"))
+								.build();
 						return chain.proceed(req);
 					}
 				})
@@ -150,15 +149,21 @@ public class PtcCredentialProvider extends CredentialProvider {
 			throws LoginFailedException, InvalidCredentialsException {
 
 		try {
-			//TODO: stop creating an okhttp client per request
-			Request get = new Request.Builder()
-					.url(LOGIN_URL)
-					.get()
-					.build();
-
 			Response getResponse;
 			try {
-				getResponse = client.newCall(get).execute();
+				getResponse = client.newCall(new Request.Builder()
+						.header("Content-Length", "-1")
+						.url(
+								HttpUrl.parse(LOGIN_OAUTH_URL).newBuilder()
+										.addQueryParameter("client_id", CLIENT_ID)
+										.addQueryParameter("redirect_uri", REDIRECT_URI)
+										.addQueryParameter("locale", LOCALE)
+										.build()
+						)
+						.get()
+						.build()
+				)
+						.execute();
 			} catch (IOException e) {
 				throw new LoginFailedException("Failed to receive contents from server", e);
 			}
@@ -173,29 +178,28 @@ public class PtcCredentialProvider extends CredentialProvider {
 				throw new LoginFailedException("Looks like the servers are down", e);
 			}
 
-			HttpUrl url = HttpUrl.parse(LOGIN_URL).newBuilder()
-					.addQueryParameter("lt", ptcAuth.getLt())
-					.addQueryParameter("execution", ptcAuth.getExecution())
-					.addQueryParameter("_eventId", "submit")
-					.addQueryParameter("username", username)
-					.addQueryParameter("password", password)
-					.build();
-
-			RequestBody reqBody = RequestBody.create(null, new byte[0]);
-
-			Request postRequest = new Request.Builder()
-					.url(url)
-					.method("POST", reqBody)
-					.build();
-
-			// Need a new client for this to not follow redirects
 			Response response;
 			try {
 				response = client.newBuilder()
 						.followRedirects(false)
 						.followSslRedirects(false)
 						.build()
-						.newCall(postRequest)
+						.newCall(new Request.Builder()
+								.header("Content-Type", "application/x-www-form-urlencoded")
+								.url(HttpUrl.parse(LOGIN_URL).newBuilder()
+										.addQueryParameter("service", SERVICE_URL).build()
+								)
+								.method("POST", new FormBody.Builder()
+										.add("lt", ptcAuth.getLt())
+										.add("execution", ptcAuth.getExecution())
+										.add("_eventId", EVENT_ID)
+										.add("locale", LOCALE)
+										.addEncoded("username", URLEncoder.encode(username))
+										.addEncoded("password", URLEncoder.encode(password))
+										.build()
+								)
+								.build()
+						)
 						.execute();
 			} catch (IOException e) {
 				throw new LoginFailedException("Network failure", e);
@@ -216,7 +220,7 @@ public class PtcCredentialProvider extends CredentialProvider {
 					throw new LoginFailedException("Unmarshalling failure", e);
 				}
 				if (ptcError.getError() != null && ptcError.getError().length() > 0) {
-					throw new InvalidCredentialsException(ptcError.getError());
+					throw new LoginFailedException(ptcError.getError());
 				} else if (ptcError.getErrors().length > 0) {
 					StringBuilder builder = new StringBuilder();
 					String[] errors = ptcError.getErrors();
@@ -225,60 +229,25 @@ public class PtcCredentialProvider extends CredentialProvider {
 						builder.append("\"").append(error).append("\", ");
 					}
 					builder.append("\"").append(errors[errors.length - 1]).append("\"");
-					throw new InvalidCredentialsException(builder.toString());
+					throw new LoginFailedException(builder.toString());
 				}
 			}
 
 			String ticket = null;
-			for (String location : response.headers("location")) {
-				String[] ticketArray = location.split("ticket=");
-				if (ticketArray.length > 1) {
-					ticket = ticketArray[1];
+			for (String cookie : response.headers("set-cookie")) {
+				if (cookie.contains("CASTGC")) {
+					cookie = cookie.substring(cookie.indexOf("CASTGC=") + 7);
+					cookie = cookie.substring(0, cookie.indexOf(";"));
+					ticket = cookie;
+					break;
 				}
 			}
 
-			if (ticket == null) {
+			if (ticket == null)
 				throw new LoginFailedException("Failed to fetch token, body:" + body);
-			}
 
-			url = HttpUrl.parse(LOGIN_OAUTH).newBuilder()
-					.addQueryParameter("client_id", CLIENT_ID)
-					.addQueryParameter("redirect_uri", REDIRECT_URI)
-					.addQueryParameter("client_secret", CLIENT_SECRET)
-					.addQueryParameter("grant_type", "refreshToken")
-					.addQueryParameter("code", ticket)
-					.build();
-
-			postRequest = new Request.Builder()
-					.url(url)
-					.method("POST", reqBody)
-					.build();
-
-			try {
-				response = client.newCall(postRequest).execute();
-			} catch (IOException e) {
-				throw new LoginFailedException("Network Failure ", e);
-			}
-
-			try {
-				body = response.body().string();
-			} catch (IOException e) {
-				throw new LoginFailedException("Network failure", e);
-			}
-
-			String[] params;
-			try {
-				params = body.split("&");
-				int expire = Integer.valueOf(params[1].split("=")[1]);
-				tokenId = params[0].split("=")[1];
-				expiresTimestamp = time.currentTimeMillis() + (expire * 1000 - REFRESH_TOKEN_BUFFER_TIME);
-				unknown2 = expire;
-				if (random.nextDouble() > 0.1) {
-					unknown2 = UK2_VALUES[random.nextInt(UK2_VALUES.length)];
-				}
-			} catch (Exception e) {
-				throw new LoginFailedException("Failed to fetch token, body:" + body);
-			}
+			tokenId = ticket;
+			expiresTimestamp = time.currentTimeMillis() + 7195 * 1000;
 		} catch (LoginFailedException e) {
 			if (shouldRetry && attempt < MAXIMUM_RETRIES) {
 				login(username, password, ++attempt);
@@ -306,17 +275,12 @@ public class PtcCredentialProvider extends CredentialProvider {
 	 */
 	@Override
 	public AuthInfo getAuthInfo(boolean refresh) throws LoginFailedException, InvalidCredentialsException {
-
-			if (refresh || isTokenIdExpired()) {
-				login(username, password, 0);
-			}
-
-			authbuilder.setProvider("ptc");
-		try {
-			authbuilder.setToken(AuthInfo.JWT.newBuilder().setContents(tokenId).setUnknown2(unknown2).build());
-		}catch(NullPointerException e){
-			throw new LoginFailedException("NPE");
+		if (refresh || isTokenIdExpired()) {
+			login(username, password, 0);
 		}
+
+		authbuilder.setProvider("ptc");
+		authbuilder.setToken(AuthInfo.JWT.newBuilder().setContents(tokenId).setUnknown2(59).build());
 
 		return authbuilder.build();
 	}
