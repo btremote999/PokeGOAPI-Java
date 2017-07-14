@@ -215,11 +215,13 @@ public class PokemonGo {
 	 * @param hashProvider to provide hashes
 	 * @throws RequestFailedException if an exception occurred while sending requests
 	 */
-	public void login(CredentialProvider credentialProvider, HashProvider hashProvider)
+//	public void login(CredentialProvider credentialProvider, HashProvider hashProvider)
+	public void login(CredentialProvider credentialProvider, HashProvider hashProvider, ItemTemplateProvider itemTemplateProvider)
 			throws RequestFailedException {
 		try {
-			itemTemplates = new ItemTemplates(new TempFileTemplateProvider());
-		} catch (IOException e) {
+//			itemTemplates = new ItemTemplates(new TempFileTemplateProvider());
+			itemTemplates = new ItemTemplates(itemTemplateProvider);
+		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 
