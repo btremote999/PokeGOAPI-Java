@@ -41,15 +41,15 @@ import lombok.Setter;
  * This requires a key and is not free like the legacy provider.
  * @see <a href="https://hashing.pogodev.org/">https://hashing.pogodev.org/</a>
  */
-public class PokeHashProvider implements HashProvider {
-	protected static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v137_1/hash";
+public abstract class PokeHashProvider implements HashProvider {
+//	protected static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v137_1/hash";
 
 	@Getter
 	@Setter
-	protected String endpoint = DEFAULT_ENDPOINT;
+	protected final String endpoint;
 
-	protected static final int VERSION = 6702;
-	protected static final long UNK25 = 5395925083854747393L;
+//	protected static final int VERSION = 6702;
+//	protected static final long UNK25 = 5395925083854747393L;
 
 	protected static final Moshi MOSHI = new Builder().build();
 
@@ -256,15 +256,15 @@ public class PokeHashProvider implements HashProvider {
 		return "";
 	}
 
-	@Override
-	public int getHashVersion() {
-		return VERSION;
-	}
+//	@Override
+//	public int getHashVersion() {
+//		return VERSION;
+//	}
 
-	@Override
-	public long getUNK25() {
-		return UNK25;
-	}
+//	@Override
+//	public long getUNK25() {
+//		return UNK25;
+//	}
 
 	public static class Response {
 		@Getter
