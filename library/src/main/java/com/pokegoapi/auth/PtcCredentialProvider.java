@@ -18,7 +18,6 @@ package com.pokegoapi.auth;
 import POGOProtos.Networking.Envelopes.RequestEnvelopeOuterClass.RequestEnvelope.AuthInfo;
 import com.pokegoapi.exceptions.request.InvalidCredentialsException;
 import com.pokegoapi.exceptions.request.LoginFailedException;
-import com.pokegoapi.exceptions.request.RequestFailedException;
 import com.pokegoapi.util.SystemTimeImpl;
 import com.pokegoapi.util.Time;
 import com.squareup.moshi.Moshi;
@@ -40,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+
 public class PtcCredentialProvider extends CredentialProvider {
 	public static final String CLIENT_SECRET = "w8ScCUXJQc6kXKw8FiOhd8Fixzht18Dq3PEVkUCP5ZPxtgyWsbTvWHFLm2wNY0JR";
 	public static final String REDIRECT_URI = "https://www.nianticlabs.com/pokemongo/error";
@@ -249,17 +249,12 @@ public class PtcCredentialProvider extends CredentialProvider {
 	 */
 	@Override
 	public AuthInfo getAuthInfo(boolean refresh) throws LoginFailedException, InvalidCredentialsException {
-
-			if (refresh || isTokenIdExpired()) {
-				login(username, password, 0);
-			}
-
-			authbuilder.setProvider("ptc");
-		try {
-			authbuilder.setToken(AuthInfo.JWT.newBuilder().setContents(tokenId).setUnknown2(59).build());
-		}catch(NullPointerException e){
-			throw new LoginFailedException("NPE");
+		if (refresh || isTokenIdExpired()) {
+			login(username, password, 0);
 		}
+
+		authbuilder.setProvider("ptc");
+		authbuilder.setToken(AuthInfo.JWT.newBuilder().setContents(tokenId).setUnknown2(59).build());
 
 		return authbuilder.build();
 	}
