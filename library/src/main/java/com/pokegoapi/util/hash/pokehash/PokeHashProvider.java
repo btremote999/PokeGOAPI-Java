@@ -45,7 +45,6 @@ public abstract class PokeHashProvider implements HashProvider {
 //	protected static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v137_1/hash";
 
 	@Getter
-	@Setter
 	protected final String endpoint;
 
 //	protected static final int VERSION = 6702;
