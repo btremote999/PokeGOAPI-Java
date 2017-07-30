@@ -177,9 +177,11 @@ public class Inventories {
 			}
 
 			// player stats
-			if (itemData.hasPlayerStats()) {
-				api.getPlayerProfile().setStats(new Stats(itemData.getPlayerStats()));
-			}
+			try {
+				if (itemData.hasPlayerStats()) {
+					api.getPlayerProfile().setStats(new Stats(itemData.getPlayerStats()));
+				}
+			}catch(RequestFailedException ignored){}
 
 			// pokedex
 			if (itemData.hasPokedexEntry()) {
