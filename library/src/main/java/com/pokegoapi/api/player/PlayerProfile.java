@@ -214,7 +214,7 @@ public class PlayerProfile {
 			throws RequestFailedException {
 		// Check if we even have achieved this level yet
 		if (level > stats.getLevel()) {
-			throw new InsufficientLevelException();
+			throw new RequestFailedException();
 		}
 		LevelUpRewardsMessage msg = LevelUpRewardsMessage.newBuilder()
 				.setLevel(level)
