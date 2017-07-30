@@ -18,6 +18,8 @@ package com.pokegoapi.api;
 import POGOProtos.Enums.TutorialStateOuterClass.TutorialState;
 import POGOProtos.Networking.Envelopes.RequestEnvelopeOuterClass.RequestEnvelope.AuthInfo;
 import POGOProtos.Networking.Envelopes.SignatureOuterClass;
+import POGOProtos.Networking.Platform.PlatformRequestTypeOuterClass.PlatformRequestType;
+import POGOProtos.Networking.Platform.Requests.GetStoreItemsRequestOuterClass.GetStoreItemsRequest;
 import POGOProtos.Networking.Requests.Messages.CheckChallengeMessageOuterClass.CheckChallengeMessage;
 import POGOProtos.Networking.Requests.Messages.GetAssetDigestMessageOuterClass.GetAssetDigestMessage;
 import POGOProtos.Networking.Requests.Messages.LevelUpRewardsMessageOuterClass.LevelUpRewardsMessage;
@@ -50,6 +52,7 @@ import com.pokegoapi.exceptions.request.RequestFailedException;
 import com.pokegoapi.main.CommonRequests;
 import com.pokegoapi.main.Heartbeat;
 import com.pokegoapi.main.RequestHandler;
+import com.pokegoapi.main.ServerPlatformRequest;
 import com.pokegoapi.main.ServerRequest;
 import com.pokegoapi.main.ServerRequestEnvelope;
 import com.pokegoapi.util.ClientInterceptor;
@@ -212,11 +215,13 @@ public class PokemonGo {
 	 * @param hashProvider to provide hashes
 	 * @throws RequestFailedException if an exception occurred while sending requests
 	 */
-	public void login(CredentialProvider credentialProvider, HashProvider hashProvider)
+//	public void login(CredentialProvider credentialProvider, HashProvider hashProvider)
+	public void login(CredentialProvider credentialProvider, HashProvider hashProvider, ItemTemplateProvider itemTemplateProvider)
 			throws RequestFailedException {
 		try {
-			itemTemplates = new ItemTemplates(new TempFileTemplateProvider());
-		} catch (IOException e) {
+//			itemTemplates = new ItemTemplates(new TempFileTemplateProvider());
+			itemTemplates = new ItemTemplates(itemTemplateProvider);
+		} catch (Exception e) {
 			throw new RuntimeException(e);
 		}
 
@@ -287,6 +292,12 @@ public class PokemonGo {
 		} catch (InvalidProtocolBufferException e) {
 			throw new RequestFailedException(e);
 		}
+
+		ByteString getStoreItems = GetStoreItemsRequest.newBuilder().build().toByteString();
+		ServerRequestEnvelope envelope = ServerRequestEnvelope.create();
+		envelope.addPlatform(new ServerPlatformRequest(PlatformRequestType.GET_STORE_ITEMS, getStoreItems));
+
+		getRequestHandler().sendServerRequests(envelope);
 
 		List<LoginListener> loginListeners = getListeners(LoginListener.class);
 

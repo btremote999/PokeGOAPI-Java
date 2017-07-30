@@ -77,11 +77,11 @@ public class Battle {
 
 	private Queue<ServerAction> serverActionQueue
 			= new PriorityBlockingQueue<>(11, new Comparator<ServerAction>() {
-				@Override
-				public int compare(ServerAction o1, ServerAction o2) {
-					return Long.compare(o1.getStart(), o2.getStart());
-				}
-			});
+		@Override
+		public int compare(ServerAction o1, ServerAction o2) {
+			return Long.compare(o1.getStart(), o2.getStart());
+		}
+	});
 
 	private Set<ServerAction> activeActions = new HashSet<>();
 	private Set<ServerAction> damagingActions = new HashSet<>();
@@ -203,7 +203,7 @@ public class Battle {
 					.setPlayerLatitude(api.getLatitude())
 					.setPlayerLongitude(api.getLongitude())
 					.setGymId(gym.getId())
-					.setDefendingPokemonId(gym.getDefendingPokemon().get(defenderIndex).getId());
+					.setDefendingPokemonId(gym.getDefendingPokemon().get(defenderIndex).getPokemon().getId());
 			for (Pokemon pokemon : attackers) {
 				builder.addAttackingPokemonIds(pokemon.getId());
 				if (pokemon.getStamina() < pokemon.getMaxStamina()) {
@@ -219,7 +219,7 @@ public class Battle {
 				StartGymBattleMessage message = builder.build();
 				ServerRequest request = new ServerRequest(RequestType.START_GYM_BATTLE, message);
 
-				api.getRequestHandler().sendServerRequests(request);
+				api.getRequestHandler().sendServerRequests(request, true);
 				StartGymBattleResponse response = StartGymBattleResponse.parseFrom(request.getData());
 
 				if (response.getResult() == StartGymBattleResponse.Result.SUCCESS) {
@@ -996,7 +996,7 @@ public class Battle {
 		 * @param action the attack action
 		 */
 		void onAttacked(PokemonGo api, Battle battle, BattlePokemon attacked, BattlePokemon attacker, int duration,
-				long damageWindowStart, long damageWindowEnd, ServerAction action);
+						long damageWindowStart, long damageWindowEnd, ServerAction action);
 
 		/**
 		 * Called when a Pokemon is attacked with the special move in this battle
@@ -1011,7 +1011,7 @@ public class Battle {
 		 * @param action the attack action
 		 */
 		void onAttackedSpecial(PokemonGo api, Battle battle, BattlePokemon attacked, BattlePokemon attacker,
-				int duration, long damageWindowStart, long damageWindowEnd, ServerAction action);
+							   int duration, long damageWindowStart, long damageWindowEnd, ServerAction action);
 
 		/**
 		 * Called when an exception occurs during this battle

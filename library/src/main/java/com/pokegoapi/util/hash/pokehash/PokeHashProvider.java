@@ -17,6 +17,7 @@ package com.pokegoapi.util.hash.pokehash;
 
 import com.pokegoapi.exceptions.request.HashException;
 import com.pokegoapi.exceptions.request.HashLimitExceededException;
+import com.pokegoapi.exceptions.request.HashUnauthorizedException;
 import com.pokegoapi.util.hash.Hash;
 import com.pokegoapi.util.hash.HashProvider;
 import com.squareup.moshi.Moshi;
@@ -40,15 +41,14 @@ import lombok.Setter;
  * This requires a key and is not free like the legacy provider.
  * @see <a href="https://hashing.pogodev.org/">https://hashing.pogodev.org/</a>
  */
-public class PokeHashProvider implements HashProvider {
-	protected static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v131_0/hash";
+public abstract class PokeHashProvider implements HashProvider {
+//	protected static final String DEFAULT_ENDPOINT = "https://pokehash.buddyauth.com/api/v137_1/hash";
 
 	@Getter
-	@Setter
-	protected String endpoint = DEFAULT_ENDPOINT;
+	protected final String endpoint;
 
-	protected static final int VERSION = 6301;
-	protected static final long UNK25 = 5348175887752539474L;
+//	protected static final int VERSION = 6702;
+//	protected static final long UNK25 = 5395925083854747393L;
 
 	protected static final Moshi MOSHI = new Builder().build();
 
@@ -175,21 +175,21 @@ public class PokeHashProvider implements HashProvider {
                                                      error);
                         }
 
-                        throw new HashException(error);
+                        throw new HashUnauthorizedException(error);
                     }
                     if (this.listener != null) {
                         this.listener.hashFailed(System.currentTimeMillis() - timestamp,
                                                  HttpURLConnection.HTTP_UNAUTHORIZED,
                                                  "Unauthorized hash request!");
                     }
-                    throw new HashException("Unauthorized hash request!");
+                    throw new HashUnauthorizedException("Unauthorized hash request!");
                 case 429:
 					if (awaitRequests) {
 						try {
 							key.await();
 							return provide(timestamp, latitude, longitude, altitude, authTicket, sessionData, requests);
 						} catch (InterruptedException e) {
-							throw new HashException(e);
+							throw new HashException("Interrupted while awaining request", e);
 						}
 					} else {
 						if (error.length() > 0) {
@@ -255,15 +255,15 @@ public class PokeHashProvider implements HashProvider {
 		return "";
 	}
 
-	@Override
-	public int getHashVersion() {
-		return VERSION;
-	}
+//	@Override
+//	public int getHashVersion() {
+//		return VERSION;
+//	}
 
-	@Override
-	public long getUNK25() {
-		return UNK25;
-	}
+//	@Override
+//	public long getUNK25() {
+//		return UNK25;
+//	}
 
 	public static class Response {
 		@Getter
@@ -290,7 +290,7 @@ public class PokeHashProvider implements HashProvider {
 		@Getter
 		private String[] requests;
 
-		public Request(double latitude, double longitude, double altitude, long timestamp, byte[] authTicket,
+		private Request(double latitude, double longitude, double altitude, long timestamp, byte[] authTicket,
 				byte[] sessionData, byte[][] requests) {
 			this.latitude64 = Double.doubleToLongBits(latitude);
 			this.longitude64 = Double.doubleToLongBits(longitude);
