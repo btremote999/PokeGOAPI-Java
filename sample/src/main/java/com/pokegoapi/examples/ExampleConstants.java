@@ -37,7 +37,7 @@ public class ExampleConstants {
 	 */
 	public static HashProvider getHashProvider() {
 		if (POKEHASH_KEY != null && POKEHASH_KEY.length() > 0) {
-			return new PokeHashProvider(PokeHashKey.from(POKEHASH_KEY), "", true,null);
+			return new PokeHashProvider(PokeHashKey.from(POKEHASH_KEY), true);
 		}
 		throw new IllegalStateException("Cannot start example without hash key");
 	}
