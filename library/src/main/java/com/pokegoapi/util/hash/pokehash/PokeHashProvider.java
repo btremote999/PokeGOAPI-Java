@@ -31,7 +31,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
+import java.util.Map;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -146,97 +149,58 @@ public abstract class PokeHashProvider implements HashProvider {
                     long location = response.getLocationHash();
                     int locationAuthHash = (int) ((locationAuth & 0xFFFFFFFFL) ^ (locationAuth >>> 32));
                     int locationHash = (int) ((location & 0xFFFFFFFFL) ^ (location >>> 32));
-                    if (this.listener != null) {
-                        this.listener.hashSuccess(System.currentTimeMillis() - timestamp);
-                    }
+
+					notifyListener(timestamp, responseCode, connection, null);
                     return new Hash(locationAuthHash,
                                     locationHash,
                                     response.getRequestHashes());
                 case HttpURLConnection.HTTP_BAD_REQUEST:
                     if (error.length() > 0) {
-                        if (this.listener != null) {
-                            this.listener.hashFailed(System.currentTimeMillis() - timestamp,
-                                                     HttpURLConnection.HTTP_BAD_REQUEST, error);
-                        }
-
+						notifyListener(timestamp, responseCode, connection, error);
                         throw new HashException(error);
                     }
-                    if (this.listener != null) {
-                        this.listener.hashFailed(System.currentTimeMillis() - timestamp,
-                                                 HttpURLConnection.HTTP_BAD_REQUEST,
-                                                 "Bad hash request!");
-                    }
+
+                    notifyListener(timestamp, responseCode, connection, "Bad hash request!");
                     throw new HashException("Bad hash request!");
                 case HttpURLConnection.HTTP_UNAUTHORIZED:
                     if (error.length() > 0) {
-                        if (this.listener != null) {
-                            this.listener.hashFailed(System.currentTimeMillis() - timestamp,
-                                                     HttpURLConnection.HTTP_UNAUTHORIZED,
-                                                     error);
-                        }
-
+						notifyListener(timestamp, responseCode, connection, error);
                         throw new HashUnauthorizedException(error);
                     }
-                    if (this.listener != null) {
-                        this.listener.hashFailed(System.currentTimeMillis() - timestamp,
-                                                 HttpURLConnection.HTTP_UNAUTHORIZED,
-                                                 "Unauthorized hash request!");
-                    }
+					notifyListener(timestamp, responseCode, connection, "Unauthorized hash request!");
                     throw new HashUnauthorizedException("Unauthorized hash request!");
                 case 429:
 					if (awaitRequests) {
 						try {
+							notifyListener(timestamp, responseCode, connection, "awaiting request");
 							key.await();
 							return provide(timestamp, latitude, longitude, altitude, authTicket, sessionData, requests);
 						} catch (InterruptedException e) {
-							throw new HashException("Interrupted while awaining request", e);
+							notifyListener(timestamp, responseCode, connection, "Interrupted while awaiting request");
+							throw new HashException("Interrupted while awaiting request", e);
 						}
 					} else {
 						if (error.length() > 0) {
-                        if (this.listener != null) {
-                            this.listener.hashFailed(System.currentTimeMillis() - timestamp,
-                                                     HttpURLConnection.HTTP_UNAUTHORIZED,
-                                                     error);
-                        }
+							notifyListener(timestamp, responseCode, connection, error);
 							throw new HashLimitExceededException(error);
 						}
 
-                    if (this.listener != null) {
-                        this.listener.hashFailed(System.currentTimeMillis() - timestamp,
-                                                 HttpURLConnection.HTTP_UNAUTHORIZED,
-                                                 "Exceeded hash limit!");
-                    }
-
+						notifyListener(timestamp, responseCode, connection, "Exceeded hash limit!");
 						throw new HashLimitExceededException("Exceeded hash limit!");
 					}
 				case HttpURLConnection.HTTP_NOT_FOUND:
+					notifyListener(timestamp, responseCode, connection, "Unknown hashing endpoint! \"" + this.endpoint + "\"");
                     throw new HashException("Unknown hashing endpoint! \"" + this.endpoint + "\"");
                 default:
                     if (error.length() > 0) {
-                        if (this.listener != null) {
-                            this.listener.hashFailed
-                                    (System.currentTimeMillis() - timestamp,
-                                     204,
-                                     error);
-                        }
-
+						notifyListener(timestamp, responseCode, connection, error);
                         throw new HashException(error + " (" + responseCode + ")");
                     }
-                    if (this.listener != null) {
-                        this.listener.hashFailed
-                                (System.currentTimeMillis() - timestamp,
-                                 204,
-                                 "Received unknown response code! (" + responseCode + ")");
-                    }
+					notifyListener(timestamp, responseCode, connection, "Unknown error");
                     throw new HashException("Received unknown response code! (" + responseCode + ")");
             }
         } catch (IOException e) {
-            if (this.listener != null) {
-                this.listener.hashFailed(System.currentTimeMillis() - timestamp,
-                                         205,
-                                         e.getMessage());
-            }
-
+			notifyListener(timestamp, 0, null, "IOException:" + e.getMessage());
             throw new HashException("Failed to perform PokeHash request", e);
         }
     }
@@ -264,6 +228,19 @@ public abstract class PokeHashProvider implements HashProvider {
 //	public long getUNK25() {
 //		return UNK25;
 //	}
+
+	private void notifyListener(long time, int responseCode, HttpURLConnection conn, String errReason){
+		if(listener == null) return;
+
+		HashResponseInfo info = HashResponseInfo.build(responseCode, conn);
+		long time_spend_ms = System.currentTimeMillis() - time;
+		if(errReason == null){
+			// error
+			listener.hashSuccess(time_spend_ms, info);
+		}else {
+			listener.hashFailed(time_spend_ms, info, errReason);
+		}
+	}
 
 	public static class Response {
 		@Getter
@@ -305,10 +282,24 @@ public abstract class PokeHashProvider implements HashProvider {
 		}
 	}
 
-	public interface HashApiCounterListener {
-		void hashFailed(long time_spend_ms, int err_no, String err_msg);
+	public static class HashResponseInfo{
+		public int responseCode;
+		public Map<String, List<String>> headers;
 
-		void hashSuccess(long time_spend_ms);
+		public static HashResponseInfo build(int responseCode, HttpURLConnection conn){
+				return new HashResponseInfo(responseCode, conn != null ?conn.getHeaderFields(): null);
+		}
+
+		public HashResponseInfo(int responseCode, Map<String, List<String>> headerFields) {
+			this.responseCode = responseCode;
+			if(headerFields != null)
+				this.headers = new HashMap<>(headerFields);
+		}
+
+	}
+	public interface HashApiCounterListener {
+		void hashFailed(long time_spend_ms,  HashResponseInfo info, String errReason);
+		void hashSuccess(long time_spend_ms, HashResponseInfo info);
 	}
 
 }
