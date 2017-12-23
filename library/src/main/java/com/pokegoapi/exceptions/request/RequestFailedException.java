@@ -15,6 +15,8 @@
 
 package com.pokegoapi.exceptions.request;
 
+import com.pokegoapi.util.Log;
+
 public class RequestFailedException extends Exception {
 	public RequestFailedException() {
 		super();
@@ -22,6 +24,7 @@ public class RequestFailedException extends Exception {
 
 	public RequestFailedException(String reason) {
 		super(reason);
+		Log.e("RequestFailException", reason);
 	}
 
 	public RequestFailedException(Throwable exception) {

@@ -17,6 +17,7 @@ package com.pokegoapi.api.device;
 
 import POGOProtos.Networking.Envelopes.SignatureOuterClass;
 import com.pokegoapi.api.PokemonGo;
+import com.pokegoapi.util.Log;
 
 import java.util.Random;
 
@@ -26,52 +27,54 @@ import java.util.Random;
 
 public class DeviceInfo {
 	private static final String[][] DEVICES = new String[][]{
-			{"iPad3,1", "iPad", "J1AP"},
-			{"iPad3,2", "iPad", "J2AP"},
-			{"iPad3,3", "iPad", "J2AAP"},
-			{"iPad3,4", "iPad", "P101AP"},
-			{"iPad3,5", "iPad", "P102AP"},
-			{"iPad3,6", "iPad", "P103AP"},
-
-			{"iPad4,1", "iPad", "J71AP"},
-			{"iPad4,2", "iPad", "J72AP"},
-			{"iPad4,3", "iPad", "J73AP"},
-			{"iPad4,4", "iPad", "J85AP"},
-			{"iPad4,5", "iPad", "J86AP"},
-			{"iPad4,6", "iPad", "J87AP"},
-			{"iPad4,7", "iPad", "J85mAP"},
-			{"iPad4,8", "iPad", "J86mAP"},
-			{"iPad4,9", "iPad", "J87mAP"},
-
-			{"iPad5,1", "iPad", "J96AP"},
-			{"iPad5,2", "iPad", "J97AP"},
-			{"iPad5,3", "iPad", "J81AP"},
-			{"iPad5,4", "iPad", "J82AP"},
-
-			{"iPad6,7", "iPad", "J98aAP"},
-			{"iPad6,8", "iPad", "J99aAP"},
-
-			{"iPad7,1", "iPad", "N102AP"},
-
-			{"iPhone5,1", "iPhone", "N41AP"},
-			{"iPhone5,2", "iPhone", "N42AP"},
-			{"iPhone5,3", "iPhone", "N48AP"},
-			{"iPhone5,4", "iPhone", "N49AP"},
-
-			{"iPhone6,1", "iPhone", "N51AP"},
-			{"iPhone6,2", "iPhone", "N53AP"},
-
-			{"iPhone7,1", "iPhone", "N56AP"},
-			{"iPhone7,2", "iPhone", "N61AP"},
-
-			{"iPhone8,1", "iPhone", "N71AP"},
-			{"iPhone8,2", "iPhone", "N66AP"},
-			{"iPhone8,4", "iPhone", "N69AP"},
-
-			{"iPhone9,1", "iPhone", "D10AP"},
-			{"iPhone9,2", "iPhone", "D11AP"},
-			{"iPhone9,3", "iPhone", "D101AP"},
-			{"iPhone9,4", "iPhone", "D111AP"}
+//			{"iPad3,1", "iPad", "J1AP"},
+//			{"iPad3,2", "iPad", "J2AP"},
+//			{"iPad3,3", "iPad", "J2AAP"},
+//			{"iPad3,4", "iPad", "P101AP"},
+//			{"iPad3,5", "iPad", "P102AP"},
+//			{"iPad3,6", "iPad", "P103AP"},
+//
+//			{"iPad4,1", "iPad", "J71AP"},
+//			{"iPad4,2", "iPad", "J72AP"},
+//			{"iPad4,3", "iPad", "J73AP"},
+//			{"iPad4,4", "iPad", "J85AP"},
+//			{"iPad4,5", "iPad", "J86AP"},
+//			{"iPad4,6", "iPad", "J87AP"},
+//			{"iPad4,7", "iPad", "J85mAP"},
+//			{"iPad4,8", "iPad", "J86mAP"},
+//			{"iPad4,9", "iPad", "J87mAP"},
+//
+//			{"iPad5,1", "iPad", "J96AP"},
+//			{"iPad5,2", "iPad", "J97AP"},
+//			{"iPad5,3", "iPad", "J81AP"},
+//			{"iPad5,4", "iPad", "J82AP"},
+//
+//			{"iPad6,7", "iPad", "J98aAP"},
+//			{"iPad6,8", "iPad", "J99aAP"},
+//
+//			{"iPad7,1", "iPad", "N102AP"},
+//
+//			{"iPhone5,1", "iPhone", "N41AP"},
+//			{"iPhone5,2", "iPhone", "N42AP"},
+//			{"iPhone5,3", "iPhone", "N48AP"},
+//			{"iPhone5,4", "iPhone", "N49AP"},
+//
+//			{"iPhone6,1", "iPhone", "N51AP"},
+//			{"iPhone6,2", "iPhone", "N53AP"},
+//
+//			{"iPhone7,1", "iPhone", "N56AP"},
+//			{"iPhone7,2", "iPhone", "N61AP"},
+//
+//			{"iPhone8,1", "iPhone", "N71AP"},
+//			{"iPhone8,2", "iPhone", "N66AP"},
+//			{"iPhone8,4", "iPhone", "N69AP"},
+//
+			{"iPhone9,1", "iPhone", "D10AP", "10.3.3"},
+			{"iPhone9,2", "iPhone", "D11AP", "10.3.3"},
+			{"iPhone9,3", "iPhone", "D101AP", "10.3.3"},
+			{"iPhone9,4", "iPhone", "D111AP", "10.3.3"},
+			{"iPhone10,4", "iPhone", "D201AP", "10.3.3"},
+			{"iPhone10,5", "iPhone", "D211AP", "10.3.3"}
 	};
 
 	private static final String[] IPHONE_OS_VERSIONS = {
@@ -130,25 +133,37 @@ public class DeviceInfo {
 	 * @param api the api
 	 * @return the default device info for the given api
 	 */
-	public static DeviceInfo getDefault(PokemonGo api) {
+	public static DeviceInfo getDefault(PokemonGo api, String devId, int devType) {
 		DeviceInfo deviceInfo = new DeviceInfo();
-		Random random = new Random(api.getSeed());
-		byte[] bytes = new byte[16];
-		random.nextBytes(bytes);
-		String[] device = DEVICES[random.nextInt(DEVICES.length)];
-		deviceInfo.setDeviceId(bytesToHex(bytes));
-		if (random.nextInt(IPHONE_OS_VERSIONS.length + IOS_VERSIONS.length) >= IPHONE_OS_VERSIONS.length) {
-			deviceInfo.setFirmwareType(IOS_VERSIONS[random.nextInt(IOS_VERSIONS.length)]);
-			deviceInfo.setFirmwareBrand("iOS");
-		} else {
-			deviceInfo.setFirmwareType(IPHONE_OS_VERSIONS[random.nextInt(IPHONE_OS_VERSIONS.length)]);
-			deviceInfo.setFirmwareBrand("iPhone OS");
-		}
+//		Random random = new Random(api.getSeed());
+//		byte[] bytes = new byte[16];
+//		random.nextBytes(bytes);
+//		String[] device = DEVICES[random.nextInt(DEVICES.length)];
+		String[] device = DEVICES[devType];
+//		deviceInfo.setDeviceId(bytesToHex(bytes));
+		// hardcoded for test device consistent
+//		deviceInfo.setDeviceId("68fc3f8cc0a50c268d93eee66455ab0e");
+		deviceInfo.setDeviceId(devId);
+//		if (random.nextInt(IPHONE_OS_VERSIONS.length + IOS_VERSIONS.length) >= IPHONE_OS_VERSIONS.length) {
+//			String firmwareType = IOS_VERSIONS[random.nextInt(IOS_VERSIONS.length)];
+//			Log.i("DeviceInfo", "DevId=" + toHex(bytes)+ ". FirmwareType:" + firmwareType + ". Brand=iOS");
+//			deviceInfo.setFirmwareType(firmwareType);
+//			deviceInfo.setFirmwareBrand("iOS");
+//		} else {
+//			String firmwareType = IPHONE_OS_VERSIONS[random.nextInt(IPHONE_OS_VERSIONS.length)];
+//			Log.i("DeviceInfo", "DevId=" + toHex(bytes)+ ". FirmwareType:" + firmwareType + ". Brand=iPhone OS");
+//			deviceInfo.setFirmwareType(firmwareType);
+//			deviceInfo.setFirmwareBrand("iPhone OS");
+//		}
+
+		deviceInfo.setFirmwareBrand("iPhone OS");
 		deviceInfo.setDeviceModelBoot(device[0]);
 		deviceInfo.setDeviceModel(device[1]);
 		deviceInfo.setHardwareModel(device[2]);
+		deviceInfo.setFirmwareType(device[3]);
 		deviceInfo.setDeviceBrand("Apple");
 		deviceInfo.setHardwareManufacturer("Apple");
+
 		return deviceInfo;
 	}
 

@@ -358,6 +358,7 @@ public class RequestHandler implements Runnable {
 			try {
 				Thread.sleep(10);
 			} catch (InterruptedException e) {
+				Log.e(TAG, "System shutdown:" + e.getMessage());
 				throw new AsyncPokemonGoException("System shutdown", e);
 			}
 
@@ -369,6 +370,7 @@ public class RequestHandler implements Runnable {
 					try {
 						Thread.sleep(THROTTLE - timeSinceLastRequest);
 					} catch (InterruptedException e) {
+						Log.e(TAG, "System shutdown:" + e.getMessage());
 						throw new AsyncPokemonGoException("System shutdown", e);
 					}
 				}

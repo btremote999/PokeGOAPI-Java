@@ -159,6 +159,10 @@ public class PokemonGo {
 	@Getter
 	@Setter
 	private ItemTemplates itemTemplates;
+	// device identifier
+	public String deviceId;
+	// variant of device [0,5] 6 variants
+	public int deviceVar;
 
 	/**
 	 * Instantiates a new Pokemon go.
@@ -215,7 +219,6 @@ public class PokemonGo {
 	 * @param hashProvider to provide hashes
 	 * @throws RequestFailedException if an exception occurred while sending requests
 	 */
-//	public void login(CredentialProvider credentialProvider, HashProvider hashProvider)
 	public void login(CredentialProvider credentialProvider, HashProvider hashProvider, ItemTemplateProvider itemTemplateProvider)
 			throws RequestFailedException {
 		try {
@@ -475,7 +478,7 @@ public class PokemonGo {
 	 */
 	public SignatureOuterClass.Signature.DeviceInfo getDeviceInfo() {
 		if (deviceInfo == null) {
-			deviceInfo = DeviceInfo.getDefault(this);
+			deviceInfo = DeviceInfo.getDefault(this, deviceId, deviceVar);
 		}
 		return deviceInfo.getDeviceInfo();
 	}
