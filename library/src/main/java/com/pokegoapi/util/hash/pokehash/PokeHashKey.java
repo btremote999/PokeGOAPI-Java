@@ -24,6 +24,8 @@ public class PokeHashKey {
 	private long ratePeriodEnd;
 
 	private boolean tested;
+	public boolean isAwait;
+	public long awaitTimeMs=5000;
 
 	private PokeHashKey(String key) {
 		this.key = key;
@@ -98,16 +100,19 @@ public class PokeHashKey {
 	 * @throws InterruptedException if the thread is interrupted while awaiting the current period to end
 	 */
 	public void await() throws InterruptedException {
+		isAwait = true;
 		if (this.requestsRemaining <= 0) {
 			long timeToPeriodEnd = System.currentTimeMillis() - this.getRatePeriodEnd();
 			if (this.tested && timeToPeriodEnd > 0) {
+
 //				Thread.sleep(Math.min(timeToPeriodEnd, 3600000));
-				Log.d("PokeHashKey", "await -> 10 seconds");
-				Thread.sleep(10000);
-				Log.d("PokeHashKey", "await -> 10 seconds passed");
-//				this.checkPeriod();
+				Log.d("PokeHashKey", "await -> "+awaitTimeMs/1000+" seconds");
+				Thread.sleep(awaitTimeMs);
+				Log.d("PokeHashKey", "await -> "+awaitTimeMs/1000+" seconds passed");
+				this.checkPeriod();
 			}
 		}
+		isAwait = false;
 	}
 
 	/**

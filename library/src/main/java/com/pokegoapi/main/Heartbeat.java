@@ -20,6 +20,7 @@ import com.pokegoapi.api.listener.HeartbeatListener;
 import com.pokegoapi.api.map.Map;
 import com.pokegoapi.api.settings.MapSettings;
 import com.pokegoapi.util.Log;
+import com.pokegoapi.util.hash.pokehash.PokeHashProvider;
 import lombok.Getter;
 
 import java.util.List;
@@ -87,7 +88,14 @@ public class Heartbeat {
 		synchronized (lock) {
 			updatingMap = this.updatingMap;
 		}
-		if (time >= nextMapUpdate && !updatingMap) {
+		PokeHashProvider hashProvider = (PokeHashProvider) api.getHashProvider();
+		boolean isAWait  = hashProvider.getKey().isAwait;
+		if(isAWait){
+			Log.i("Heartbeat", "awaiting");
+			hashProvider.getKey().awaitTimeMs = 30000;
+		}
+
+		if (time >= nextMapUpdate && !updatingMap && !isAWait) {
 			synchronized (lock) {
 				this.updatingMap = true;
 			}
