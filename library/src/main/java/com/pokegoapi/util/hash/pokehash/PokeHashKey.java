@@ -1,5 +1,6 @@
 package com.pokegoapi.util.hash.pokehash;
 
+import com.pokegoapi.util.Log;
 import lombok.Getter;
 
 import java.net.HttpURLConnection;
@@ -100,8 +101,11 @@ public class PokeHashKey {
 		if (this.requestsRemaining <= 0) {
 			long timeToPeriodEnd = System.currentTimeMillis() - this.getRatePeriodEnd();
 			if (this.tested && timeToPeriodEnd > 0) {
-				Thread.sleep(Math.min(timeToPeriodEnd, 3600000));
-				this.checkPeriod();
+//				Thread.sleep(Math.min(timeToPeriodEnd, 3600000));
+				Log.d("PokeHashKey", "await -> 10 seconds");
+				Thread.sleep(10000);
+				Log.d("PokeHashKey", "await -> 10 seconds passed");
+//				this.checkPeriod();
 			}
 		}
 	}

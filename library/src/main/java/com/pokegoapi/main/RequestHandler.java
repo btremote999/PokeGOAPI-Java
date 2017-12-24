@@ -325,10 +325,12 @@ public class RequestHandler implements Runnable {
 			throws RequestFailedException {
 		builder.setStatusCode(2);
 		builder.setRequestId(requestIdGenerator.next());
+
 		boolean refresh = authTicket != null && api.currentTimeMillis() >= authTicket.getExpireTimestampMs();
 		if (authTicket != null && !refresh) {
 			builder.setAuthTicket(authTicket);
 		} else {
+			// kklow: seem it stuck here and cannot work -> try with reset the token
 			Log.d(TAG, "Authenticated with static token");
 			builder.setAuthInfo(api.getAuthInfo(refresh));
 		}
@@ -348,6 +350,7 @@ public class RequestHandler implements Runnable {
 		builder.setLatitude(latitude);
 		builder.setLongitude(longitude);
 		builder.setAccuracy(accuracy);
+		Log.d(TAG, "resetBuilder end");
 	}
 
 	@Override
@@ -399,8 +402,13 @@ public class RequestHandler implements Runnable {
 
 				ServerResponse response = new ServerResponse();
 				try {
+					Log.d(TAG, "send Request: arrayRequest:total=" + arrayRequests.length);
 					response = sendInternal(response, arrayRequests, arrayPlatformRequests);
 				} catch (RequestFailedException e) {
+					Log.e(TAG, "sendInternal: RequestFailedException-" + e.getMessage());
+					response.setException(e);
+				}catch(Exception e){
+					Log.e(TAG, "sendInternal: Exception-" + e.getMessage());
 					response.setException(e);
 				}
 

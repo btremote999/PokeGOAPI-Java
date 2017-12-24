@@ -18,6 +18,7 @@ package com.pokegoapi.util.hash.pokehash;
 import com.pokegoapi.exceptions.request.HashException;
 import com.pokegoapi.exceptions.request.HashLimitExceededException;
 import com.pokegoapi.exceptions.request.HashUnauthorizedException;
+import com.pokegoapi.util.Log;
 import com.pokegoapi.util.hash.Hash;
 import com.pokegoapi.util.hash.HashProvider;
 import com.squareup.moshi.Moshi;
@@ -128,8 +129,9 @@ public abstract class PokeHashProvider implements HashProvider {
 			out.flush();
 			out.close();
 
+			Log.d("PokeHashProvider", "sending hash request");
 			int responseCode = connection.getResponseCode();
-
+			Log.d("PokeHashProvider", "hash request response: " + responseCode);
 			this.key.setProperties(connection);
 
 			String error = getError(connection);

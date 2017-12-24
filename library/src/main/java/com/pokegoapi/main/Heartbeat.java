@@ -19,6 +19,7 @@ import com.pokegoapi.api.PokemonGo;
 import com.pokegoapi.api.listener.HeartbeatListener;
 import com.pokegoapi.api.map.Map;
 import com.pokegoapi.api.settings.MapSettings;
+import com.pokegoapi.util.Log;
 import lombok.Getter;
 
 import java.util.List;
@@ -75,6 +76,7 @@ public class Heartbeat {
 	 * Performs a single heartbeat
 	 */
 	public void beat() {
+
 		MapSettings mapSettings = api.getSettings().getMapSettings();
 		minMapRefresh = (long) mapSettings.getMinRefresh();
 		maxMapRefresh = (long) mapSettings.getMaxRefresh();
@@ -94,6 +96,7 @@ public class Heartbeat {
 				if (map.update()) {
 					nextMapUpdate = time + minMapRefresh;
 				}
+				Log.d("Heartbeat", "beat");
 				for (HeartbeatListener listener : listeners) {
 					listener.onMapUpdate(api, map.getMapObjects());
 				}

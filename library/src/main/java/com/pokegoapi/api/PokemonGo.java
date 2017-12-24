@@ -56,6 +56,7 @@ import com.pokegoapi.main.ServerPlatformRequest;
 import com.pokegoapi.main.ServerRequest;
 import com.pokegoapi.main.ServerRequestEnvelope;
 import com.pokegoapi.util.ClientInterceptor;
+import com.pokegoapi.util.Log;
 import com.pokegoapi.util.SystemTimeImpl;
 import com.pokegoapi.util.Time;
 import com.pokegoapi.util.hash.HashProvider;
@@ -225,9 +226,11 @@ public class PokemonGo {
 //			itemTemplates = new ItemTemplates(new TempFileTemplateProvider());
 			itemTemplates = new ItemTemplates(itemTemplateProvider);
 		} catch (Exception e) {
+			Log.e(TAG, "Load Template: " + e.getMessage());
 			throw new RuntimeException(e);
 		}
 
+		Log.d(TAG, "Logging In");
 		this.loggingIn = true;
 		if (credentialProvider == null) {
 			throw new NullPointerException("Credential Provider can not be null!");
@@ -255,14 +258,18 @@ public class PokemonGo {
 	}
 
 	private void initialize() throws RequestFailedException {
+		Log.d(TAG, "initialize");
 		if (getRequestHandler() != null) {
+			Log.w(TAG, "old request handle exist -> remove old requestHandler");
 			getRequestHandler().exit();
 		}
 
+		Log.d(TAG, "create request Handler");
 		requestHandler = new RequestHandler(this, client);
 
 		getRequestHandler().sendServerRequests(ServerRequestEnvelope.create());
 
+		Log.d(TAG, "update player profile...");
 		playerProfile.updateProfile();
 
 		ServerRequest downloadConfigRequest = new ServerRequest(RequestType.DOWNLOAD_REMOTE_CONFIG_VERSION,
@@ -272,16 +279,21 @@ public class PokemonGo {
 
 		try {
 			ByteString configVersionData = downloadConfigRequest.getData();
+			Log.d(TAG, "requesting configVersion Data" + configVersionData.toString());
 			if (itemTemplates.requiresUpdate(DownloadRemoteConfigVersionResponse.parseFrom(configVersionData))) {
 				itemTemplates.update(this);
 			}
 		} catch (InvalidProtocolBufferException e) {
+			Log.e(TAG, "request configVersion exception:" + e.getMessage());
 			throw new RequestFailedException(e);
 		}
 
+		Log.d(TAG, "get player profile");
 		playerProfile.getProfile();
+		Log.d(TAG, "get player profile completed");
 
 		try {
+			Log.d(TAG, "check levelup rewards message");
 			LevelUpRewardsMessage rewardsMessage = LevelUpRewardsMessage.newBuilder()
 					.setLevel(playerProfile.getLevel())
 					.build();
@@ -293,14 +305,24 @@ public class PokemonGo {
 				inventories.getItemBag().addAwardedItems(levelUpRewardsResponse);
 			}
 		} catch (InvalidProtocolBufferException e) {
+			Log.d(TAG, "get levelup reward message. Excption:" + e.getMessage());
 			throw new RequestFailedException(e);
 		}
 
-		ByteString getStoreItems = GetStoreItemsRequest.newBuilder().build().toByteString();
-		ServerRequestEnvelope envelope = ServerRequestEnvelope.create();
-		envelope.addPlatform(new ServerPlatformRequest(PlatformRequestType.GET_STORE_ITEMS, getStoreItems));
+		Log.d(TAG, "get StoreItems");
 
-		getRequestHandler().sendServerRequests(envelope);
+		try {
+			ByteString getStoreItems = GetStoreItemsRequest.newBuilder().build().toByteString();
+			ServerRequestEnvelope envelope = ServerRequestEnvelope.create();
+			envelope.addPlatform(new ServerPlatformRequest(PlatformRequestType.GET_STORE_ITEMS, getStoreItems));
+			getRequestHandler().sendServerRequests(envelope);
+		}catch(RequestFailedException e){
+			Log.d(TAG, "getStoreItem Request: RequestFailedException" + e.getMessage());
+			throw new RequestFailedException(e);
+		}catch(Exception e){
+			Log.d(TAG, "getStoreItem Request: Exception" + e.getMessage());
+			throw new RequestFailedException(e);
+		}
 
 		List<LoginListener> loginListeners = getListeners(LoginListener.class);
 
@@ -313,28 +335,38 @@ public class PokemonGo {
 
 		ArrayList<TutorialState> tutorialStates = playerProfile.getTutorialState().getTutorialStates();
 
+		Log.d(TAG, "check tutorial state...");
 		if (tutorialStates.isEmpty()) {
+			Log.i(TAG, "tutorialState is Empty -> activateAccount");
 			playerProfile.activateAccount();
 		}
 
 		if (!tutorialStates.contains(TutorialState.AVATAR_SELECTION)) {
+			Log.i(TAG, "TutorialState.AVATAR_SELECTION -> setup Avatar");
 			playerProfile.setupAvatar();
 		}
 
+		Log.d(TAG, "start heartbeat");
 		heartbeat.start();
 
 		if (!tutorialStates.contains(TutorialState.POKEMON_CAPTURE)) {
+			Log.i(TAG, "TutorialState.POKEMON_CAPTURE -> encounterTutorialComplete");
 			playerProfile.encounterTutorialComplete();
 		}
 
+
 		int remainingCodenameClaims = getPlayerProfile().getPlayerData().getRemainingCodenameClaims();
 		if (!tutorialStates.contains(TutorialState.NAME_SELECTION) && remainingCodenameClaims > 0) {
+			Log.i(TAG, "TutotialState.NAME_SELECTION , claims>0 -> claimCodeName");
 			playerProfile.claimCodeName();
 		}
 
 		if (!tutorialStates.contains(TutorialState.FIRST_TIME_EXPERIENCE_COMPLETE)) {
+			Log.i(TAG,"TutorialState.FIRST_TIME_EXPERIENCE_COMPLETE -> firstTimeExperienceComplete");
 			playerProfile.firstTimeExperienceComplete();
 		}
+
+		Log.i(TAG, "PokemonGo.Initialize done");
 	}
 
 	/**
