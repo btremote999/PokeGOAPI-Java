@@ -240,6 +240,14 @@ public class RequestHandler implements Runnable {
 			if (requests.length > 0) {
 				for (int i = 0; i < responseEnvelope.getReturnsCount(); i++) {
 					ByteString returned = responseEnvelope.getReturns(i);
+
+					// TODO: by-pass: but no idea why the request not tally
+					/*
+					java.lang.ArrayIndexOutOfBoundsException: length=1; index=1 at com.pokegoapi.main.RequestHandler.sendInternal(RequestHandler.java:243)
+					 */
+					if(i >= requests.length)
+						continue;
+
 					ServerRequest serverRequest = requests[i];
 					if (returned != null) {
 						serverResponse.addResponse(serverRequest.getType(), returned);

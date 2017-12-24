@@ -210,6 +210,11 @@ public class Inventories {
 			for (Map.Entry<ItemId, AppliedItem> entry : appliedItems.entrySet()) {
 				ItemId itemId = entry.getKey();
 				AppliedItem applied = entry.getValue();
+
+				// Unrecognized item -> skip it
+				if(itemId == ItemId.UNRECOGNIZED)
+					continue;
+
 				if (api.currentTimeMillis() >= applied.getExpireMs()) {
 					stale.add(itemId);
 				} else {
@@ -220,6 +225,10 @@ public class Inventories {
 			}
 
 			for (ItemId item : stale) {
+				// skip unRecognized item
+				if(item == ItemId.UNRECOGNIZED)
+					continue;
+
 				appliedItems.remove(item);
 				itemBag.getItem(item).removeApplied();
 			}

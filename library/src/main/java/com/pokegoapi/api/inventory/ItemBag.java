@@ -307,6 +307,10 @@ public class ItemBag {
 	 */
 	public void addAwardedItems(LevelUpRewardsResponse levelUpResponse) {
 		for (ItemAward itemAward : levelUpResponse.getItemsAwardedList()) {
+			ItemId rewardItemId = itemAward.getItemId();
+			if(rewardItemId == ItemId.UNRECOGNIZED)
+				continue;
+
 			Item item = getItem(itemAward.getItemId());
 			item.setCount(item.getCount() + itemAward.getItemCount());
 		}
