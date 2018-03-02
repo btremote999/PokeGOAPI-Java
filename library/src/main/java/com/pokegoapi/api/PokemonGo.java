@@ -21,12 +21,14 @@ import POGOProtos.Networking.Envelopes.SignatureOuterClass;
 import POGOProtos.Networking.Platform.PlatformRequestTypeOuterClass.PlatformRequestType;
 import POGOProtos.Networking.Platform.Requests.GetStoreItemsRequestOuterClass.GetStoreItemsRequest;
 import POGOProtos.Networking.Requests.Messages.CheckChallengeMessageOuterClass.CheckChallengeMessage;
+import POGOProtos.Networking.Requests.Messages.FetchAllNewsMessageOuterClass.FetchAllNewsMessage;
 import POGOProtos.Networking.Requests.Messages.GetAssetDigestMessageOuterClass.GetAssetDigestMessage;
 import POGOProtos.Networking.Requests.Messages.LevelUpRewardsMessageOuterClass.LevelUpRewardsMessage;
 import POGOProtos.Networking.Requests.Messages.VerifyChallengeMessageOuterClass.VerifyChallengeMessage;
 import POGOProtos.Networking.Requests.RequestTypeOuterClass.RequestType;
 import POGOProtos.Networking.Responses.CheckChallengeResponseOuterClass.CheckChallengeResponse;
 import POGOProtos.Networking.Responses.DownloadRemoteConfigVersionResponseOuterClass.DownloadRemoteConfigVersionResponse;
+import POGOProtos.Networking.Responses.FetchAllNewsResponseOuterClass.FetchAllNewsResponse;
 import POGOProtos.Networking.Responses.LevelUpRewardsResponseOuterClass.LevelUpRewardsResponse;
 import POGOProtos.Networking.Responses.LevelUpRewardsResponseOuterClass.LevelUpRewardsResponse.Result;
 import POGOProtos.Networking.Responses.VerifyChallengeResponseOuterClass.VerifyChallengeResponse;
@@ -42,19 +44,14 @@ import com.pokegoapi.api.listener.LocationListener;
 import com.pokegoapi.api.listener.LoginListener;
 import com.pokegoapi.api.map.Map;
 import com.pokegoapi.api.map.Point;
+import com.pokegoapi.api.news.News;
 import com.pokegoapi.api.player.PlayerProfile;
 import com.pokegoapi.api.settings.Settings;
 import com.pokegoapi.api.settings.templates.ItemTemplateProvider;
 import com.pokegoapi.api.settings.templates.ItemTemplates;
-import com.pokegoapi.api.settings.templates.TempFileTemplateProvider;
 import com.pokegoapi.auth.CredentialProvider;
 import com.pokegoapi.exceptions.request.RequestFailedException;
-import com.pokegoapi.main.CommonRequests;
-import com.pokegoapi.main.Heartbeat;
-import com.pokegoapi.main.RequestHandler;
-import com.pokegoapi.main.ServerPlatformRequest;
-import com.pokegoapi.main.ServerRequest;
-import com.pokegoapi.main.ServerRequestEnvelope;
+import com.pokegoapi.main.*;
 import com.pokegoapi.util.ClientInterceptor;
 import com.pokegoapi.util.Log;
 import com.pokegoapi.util.SystemTimeImpl;
@@ -64,13 +61,8 @@ import lombok.Getter;
 import lombok.Setter;
 import okhttp3.OkHttpClient;
 
-import java.io.IOException;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 
 
 public class PokemonGo {
@@ -87,6 +79,8 @@ public class PokemonGo {
 	private PlayerProfile playerProfile;
 	@Getter
 	private Inventories inventories;
+	@Getter
+	private News news;
 	@Getter
 	private double latitude;
 	@Getter
@@ -250,6 +244,7 @@ public class PokemonGo {
 		active = false;
 		new Random().nextBytes(sessionHash);
 		inventories = new Inventories(this);
+		news = new News(this);
 		settings = new Settings(this);
 		playerProfile = new PlayerProfile(this);
 		map = new Map(this);
@@ -322,6 +317,25 @@ public class PokemonGo {
 		}catch(Exception e){
 			Log.d(TAG, "getStoreItem Request: Exception" + e.getMessage());
 			throw new RequestFailedException(e);
+		}
+
+		try {
+			FetchAllNewsMessage msg = FetchAllNewsMessage.newBuilder().build();
+			ServerRequest request = new ServerRequest(RequestType.FETCH_ALL_NEWS, msg);
+			ServerRequestEnvelope envelope = ServerRequestEnvelope.create(request);
+			getRequestHandler().sendServerRequests(envelope);
+			FetchAllNewsResponse response = FetchAllNewsResponse.parseFrom(request.getData());
+			if (response.getResult() == FetchAllNewsResponse.Result.SUCCESS) {
+				Log.i(TAG, "FetchAllNewsMessage Success: total News=" + response.getCurrentNews().getNewsArticlesCount());
+				this.news.setCurrentNews(response.getCurrentNews());
+
+				// mark to read
+                this.news.markUnreadNews();
+			} else {
+				Log.d(TAG, "FetchAllNewsMessage Failed. Result=" + response.getResult());
+			}
+		} catch (Exception e) {
+			Log.d(TAG, "Exceptions FetchAllNew");
 		}
 
 		List<LoginListener> loginListeners = getListeners(LoginListener.class);

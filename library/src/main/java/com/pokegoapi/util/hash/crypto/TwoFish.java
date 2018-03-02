@@ -274,7 +274,7 @@ public final class TwoFish {
 	 *
 	 * @param k The 64/128/192/256-bit user-key to use.
 	 * @return This cipher's round keys.
-//	 * @throws InvalidKeyException If the key is invalid.
+	 * @throws Exception If the key is invalid.
 	 */
 	public static synchronized Object makeKey(byte[] k) throws Exception {
 		if (k == null)

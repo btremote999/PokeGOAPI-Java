@@ -338,7 +338,7 @@ public class RequestHandler implements Runnable {
 		if (authTicket != null && !refresh) {
 			builder.setAuthTicket(authTicket);
 		} else {
-			// kklow: seem it stuck here and cannot work -> try with reset the token
+			// seem it stuck here and cannot work -> try with reset the token
 			Log.d(TAG, "Authenticated with static token");
 			builder.setAuthInfo(api.getAuthInfo(refresh));
 		}

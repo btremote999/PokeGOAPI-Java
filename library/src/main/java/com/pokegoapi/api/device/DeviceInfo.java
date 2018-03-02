@@ -131,6 +131,7 @@ public class DeviceInfo {
 	 * Gets the default device info for the given api
 	 *
 	 * @param api the api
+	 * @param devId device index (from DEVICES array)
 	 * @return the default device info for the given api
 	 */
 	public static DeviceInfo getDefault(PokemonGo api, String devId, int devType) {
